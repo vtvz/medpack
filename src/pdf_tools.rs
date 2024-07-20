@@ -13,7 +13,6 @@ pub fn text_to_pdf(app: &App, slug: impl Display, content: &str) -> eyre::Result
         line-height: 1.1;
     }
 
-/*
     table {
         border-collapse: collapse;
         width: 100%;
@@ -39,7 +38,6 @@ pub fn text_to_pdf(app: &App, slug: impl Display, content: &str) -> eyre::Result
     table tr:nth-child(odd) {
         background-color: #ffffff;
     }
-    */
 
     ul {
         margin: 0;

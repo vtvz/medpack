@@ -4,7 +4,12 @@ use std::path::Path;
 
 use eyre::Ok;
 use itertools::Itertools;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::iter::{
+    IndexedParallelIterator,
+    IntoParallelIterator,
+    IntoParallelRefIterator,
+    ParallelIterator,
+};
 use regex::Regex;
 use structs::{Export, Message, Record, TocItem};
 
@@ -176,13 +181,11 @@ fn process_message(app: &App, msg: &Message) -> eyre::Result<String> {
 }
 
 fn process_record<'a>(app: &App, rec: &'a Record) -> eyre::Result<(Vec<String>, Vec<TocItem<'a>>)> {
-    println!("{:?}", rec);
     let mut pdfs = vec![];
     let mut toc_items = vec![];
     let mut pages = 0;
-    // let toc_item = format!("{}: {}", &rec.date, rec.tags.join(", "));
+
     for (i, msg) in rec.messages.iter().enumerate() {
-        println!("{:?}", msg);
         let pdf = process_message(app, msg)?;
 
         let label = format!("{}: {}", rec.tags.join(", "), &rec.date);
@@ -259,17 +262,20 @@ fn generate_toc_file(app: &App, toc_items: &[TocItem]) -> eyre::Result<String> {
 fn process_person(app: &App, name: &str, recs: &[Record]) -> eyre::Result<()> {
     println!("## Process person {}", name);
 
-    let mut pdfs = vec![];
-    let mut toc_items = vec![];
+    let results = recs
+        .par_iter()
+        .enumerate()
+        .map(|(i, rec)| {
+            println!("{} - {} of {}", name, i + 1, recs.len());
 
-    for (i, rec) in recs.iter().enumerate() {
-        println!("{} - {} of {}", name, i + 1, recs.len());
+            process_record(app, rec)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
-        let (out_pdfs, out_toc_items) = process_record(app, rec)?;
+    let (pdfs, toc_items): (Vec<_>, Vec<_>) = results.into_iter().unzip();
 
-        pdfs.extend(out_pdfs);
-        toc_items.extend(out_toc_items);
-    }
+    let mut pdfs = pdfs.into_iter().flatten().collect_vec();
+    let toc_items = toc_items.into_iter().flatten().collect_vec();
 
     let toc_path = generate_toc_file(app, &toc_items)?;
 
