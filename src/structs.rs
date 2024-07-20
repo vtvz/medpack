@@ -84,7 +84,21 @@ impl Message {
     }
 
     pub fn is_photo(&self) -> bool {
-        self.photo.is_some()
+        self.photo.is_some() || self.mime_type == Some("image/jpeg".into())
+    }
+
+    pub fn unwrap_photo(&self) -> &str {
+        if let Some(photo) = self.photo.as_ref() {
+            photo
+        } else if self.mime_type == Some("image/jpeg".into()) {
+            self.unwrap_file()
+        } else {
+            panic!("File should exist")
+        }
+    }
+
+    pub fn unwrap_file(&self) -> &str {
+        self.file.as_ref().unwrap()
     }
 
     pub fn is_pdf(&self) -> bool {

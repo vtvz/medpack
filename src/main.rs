@@ -4,10 +4,11 @@ use std::path::Path;
 
 use eyre::Ok;
 use itertools::Itertools;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use regex::Regex;
 use structs::{Export, Message, Record, TocItem};
 
-use crate::command::cmd;
+use crate::command::{img2pdf, pdf_info, pdfunite};
 use crate::pdf_tools::text_to_pdf;
 use crate::structs::App;
 
@@ -68,7 +69,7 @@ fn group_messages(mut msgs: Vec<Message>) -> Vec<Record> {
 }
 
 fn get_pdf_pages(path: &str) -> eyre::Result<u8> {
-    let out = cmd("/usr/bin/pdfinfo", [path])?;
+    let out = pdf_info(path)?;
     let re = Regex::new(r"(?m)^Pages:\s+(\d+)$")?;
 
     let cap = re.captures(&out).ok_or(eyre::eyre!("Need captures"))?;
@@ -134,32 +135,32 @@ fn app() -> eyre::Result<()> {
         tmp_img = app.tmp_img(""),
     );
 
-    for (name, recs) in collection.iter() {
-        process_person(&app, name, recs)?;
-    }
+    let result: Result<Vec<_>, _> = collection
+        .into_par_iter()
+        .map(|(name, recs)| process_person(&app, &name, &recs))
+        .collect();
+
+    result?;
 
     Ok(())
 }
 
 fn process_message(app: &App, msg: &Message) -> eyre::Result<String> {
     let path = if msg.is_pdf() {
-        format!("{}/{}", app.export_path(), msg.file.as_ref().unwrap())
+        format!("{}/{}", app.export_path(), msg.unwrap_file())
     } else if msg.is_photo() {
         // img2pdf --imgsize 595x5000 --fit into {} -o "${TMP}/{/.}.img.pdf"
         let path = app.tmp_img(format!("{}.pdf", msg.id));
 
-        cmd(
-            "/usr/bin/img2pdf",
-            [
-                "--imgsize",
-                "595x5000",
-                "--fit",
-                "into",
-                &format!("{}/{}", app.export_path(), &msg.photo.as_ref().unwrap()),
-                "-o",
-                &path,
-            ],
-        )?;
+        img2pdf([
+            "--imgsize",
+            "595x5000",
+            "--fit",
+            "into",
+            &format!("{}/{}", app.export_path(), msg.unwrap_photo()),
+            "-o",
+            &path,
+        ])?;
 
         path
     } else {
@@ -175,11 +176,13 @@ fn process_message(app: &App, msg: &Message) -> eyre::Result<String> {
 }
 
 fn process_record<'a>(app: &App, rec: &'a Record) -> eyre::Result<(Vec<String>, Vec<TocItem<'a>>)> {
+    println!("{:?}", rec);
     let mut pdfs = vec![];
     let mut toc_items = vec![];
     let mut pages = 0;
     // let toc_item = format!("{}: {}", &rec.date, rec.tags.join(", "));
     for (i, msg) in rec.messages.iter().enumerate() {
+        println!("{:?}", msg);
         let pdf = process_message(app, msg)?;
 
         let label = format!("{}: {}", rec.tags.join(", "), &rec.date);
@@ -279,7 +282,7 @@ fn process_person(app: &App, name: &str, recs: &[Record]) -> eyre::Result<()> {
 
     pdfs.push(result_pdf.clone());
 
-    cmd("pdfunite", pdfs)?;
+    pdfunite(pdfs)?;
 
     println!("{name} - result file {}\n", result_pdf);
 
