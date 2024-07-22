@@ -13,32 +13,6 @@ pub fn text_to_pdf(app: &App, slug: impl Display, content: &str) -> eyre::Result
         line-height: 1.1;
     }
 
-    table {
-        border-collapse: collapse;
-        width: 100%;
-    }
-
-    td {
-        padding: 4px;
-    }
-
-    th {
-        padding: 4px;
-        background-color: #54585d;
-        color: #ffffff;
-        border: 1px solid #54585d;
-    }
-
-    tr {
-        background-color: #dddddd;
-        border: 1px solid #1A1D23;
-        border-top: none;
-    }
-
-    table tr:nth-child(odd) {
-        background-color: #ffffff;
-    }
-
     ul {
         margin: 0;
         padding-left: 30px;
@@ -67,17 +41,19 @@ pub fn text_to_pdf(app: &App, slug: impl Display, content: &str) -> eyre::Result
 
     fs::write(&path, content).expect("Should have been able to read the file");
 
-    command::wkhtmltopdf([
-        "--encoding",
-        "utf-8",
-        "--zoom",
-        "1.4",
-        "--page-width",
-        "210mm",
-        "--disable-smart-shrinking",
+    command::wkhtmltopdf(
+        &[
+            "--encoding",
+            "utf-8",
+            "--zoom",
+            "1.4",
+            "--page-width",
+            "210mm",
+            "--disable-smart-shrinking",
+        ],
         &path,
         &output_path,
-    ])?;
+    )?;
 
     Ok(output_path)
 }
