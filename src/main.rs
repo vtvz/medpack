@@ -142,6 +142,7 @@ fn app() -> eyre::Result<()> {
 
     let result: Result<Vec<_>, _> = collection
         .into_par_iter()
+        // .into_iter()
         .map(|(name, recs)| process_person(&app, &name, &recs))
         .collect();
 
@@ -211,50 +212,45 @@ fn process_record<'a>(app: &App, rec: &'a Record) -> eyre::Result<(Vec<String>, 
     Ok((pdfs, toc_items))
 }
 
-fn generate_toc_file(app: &App, toc_items: &[TocItem]) -> eyre::Result<String> {
-    let mut shift = 0;
-    let mut output_path = "".into();
+fn generate_toc_file(app: &App, person_name: &str, toc_items: &[TocItem]) -> eyre::Result<String> {
+    let shift = 1;
 
-    for _ in 0..2 {
-        let mut current_page = shift;
-        let content = toc_items
-            .iter()
-            .map(|item| {
-                current_page += item.pages;
-                format!(
-                    r#"
-                    <tr>
-                        <td>{}</td>
-                        <td style="width: 100%"><ul><li>{}</li></ul></td>
-                        <td style="text-align: right"> {}</td>
-                    </tr>
-                    "#,
-                    item.record.date,
-                    item.record.tags.join("</li><li>"),
-                    current_page - item.pages + 1,
-                )
-            })
-            .join("");
-
-        output_path = text_to_pdf(
-            app,
-            "toc",
-            &format!(
+    let mut current_page = shift;
+    let content = toc_items
+        .iter()
+        .map(|item| {
+            current_page += item.pages;
+            format!(
                 r#"
-                <table class="table table-striped table-sm">
-                    <tr class="thead-dark">
-                        <th style="text-align: left">date</th>
-                        <th style="width: 100%; text-align: left">info</th>
-                        <th style="text-align: right">#</th>
-                    </tr>
-                    {content}
-                </table>
-                "#
-            ),
-        )?;
+                <tr>
+                    <td>{}</td>
+                    <td style="width: 100%"><ul><li>{}</li></ul></td>
+                    <td style="text-align: right"> {}</td>
+                </tr>
+                "#,
+                item.record.date,
+                item.record.tags.join("</li><li>"),
+                current_page - item.pages + 1,
+            )
+        })
+        .join("");
 
-        shift = get_pdf_pages(&output_path)?;
-    }
+    let output_path = text_to_pdf(
+        app,
+        "toc-".to_string() + person_name,
+        &format!(
+            r#"
+            <table class="table table-striped table-sm">
+                <tr class="thead-dark">
+                    <th style="text-align: left">date</th>
+                    <th style="width: 100%; text-align: left">info</th>
+                    <th style="text-align: right">#</th>
+                </tr>
+                {content}
+            </table>
+            "#
+        ),
+    )?;
 
     Ok(output_path)
 }
@@ -264,6 +260,7 @@ fn process_person(app: &App, name: &str, recs: &[Record]) -> eyre::Result<()> {
 
     let results = recs
         .par_iter()
+        // .iter()
         .enumerate()
         .map(|(i, rec)| {
             println!("{} - {} of {}", name, i + 1, recs.len());
@@ -277,7 +274,7 @@ fn process_person(app: &App, name: &str, recs: &[Record]) -> eyre::Result<()> {
     let mut pdfs = pdfs.into_iter().flatten().collect_vec();
     let toc_items = toc_items.into_iter().flatten().collect_vec();
 
-    let toc_path = generate_toc_file(app, &toc_items)?;
+    let toc_path = generate_toc_file(app, name, &toc_items)?;
 
     pdfs.insert(0, toc_path);
 

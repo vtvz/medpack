@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::path::Path;
 
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
@@ -143,25 +144,28 @@ pub struct TocItem<'a> {
 }
 
 pub struct App {
-    tmp_img: TempDir,
-    tmp_html: TempDir,
-    tmp_label: TempDir,
+    tmp_img: Box<dyn AsRef<Path> + Sync + Send>,
+    tmp_html: Box<dyn AsRef<Path> + Sync + Send>,
+    tmp_label: Box<dyn AsRef<Path> + Sync + Send>,
     export_path: String,
 }
 
 impl App {
     pub fn new(export_path: &str) -> eyre::Result<Self> {
         Ok(Self {
-            tmp_img: TempDir::new("tmp_img")?,
-            tmp_html: TempDir::new("tmp_html")?,
-            tmp_label: TempDir::new("tmp_label")?,
+            // tmp_img: Box::new(TempDir::new("tmp_img")?),
+            // tmp_html: Box::new(TempDir::new("tmp_html")?),
+            // tmp_label: Box::new(TempDir::new("tmp_label")?),
+            tmp_img: Box::new(TempDir::new("tmp_img")?.into_path()),
+            tmp_html: Box::new(TempDir::new("tmp_html")?.into_path()),
+            tmp_label: Box::new(TempDir::new("tmp_label")?.into_path()),
             export_path: export_path.trim_end_matches('/').into(),
         })
     }
 
-    fn tmp_file(tmp: &TempDir, file: impl Display) -> String {
+    fn tmp_file(tmp: impl AsRef<Path>, file: impl Display) -> String {
         let tmp = tmp
-            .path()
+            .as_ref()
             .to_path_buf()
             .into_os_string()
             .into_string()
@@ -171,15 +175,15 @@ impl App {
     }
 
     pub fn tmp_img(&self, file: impl Display) -> String {
-        Self::tmp_file(&self.tmp_img, file)
+        Self::tmp_file(self.tmp_img.as_ref(), file)
     }
 
     pub fn tmp_html(&self, file: impl Display) -> String {
-        Self::tmp_file(&self.tmp_html, file)
+        Self::tmp_file(self.tmp_html.as_ref(), file)
     }
 
     pub fn tmp_label(&self, file: impl Display) -> String {
-        Self::tmp_file(&self.tmp_label, file)
+        Self::tmp_file(self.tmp_label.as_ref(), file)
     }
 
     pub fn export_path(&self) -> &str {
