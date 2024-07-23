@@ -46,8 +46,6 @@ impl PdfTools {
 
         fs::write(&path, content).expect("Should have been able to read the file");
 
-        let page_chunk_height = 50;
-        let page_margin = 10;
         let generate_file = |height: u64, margin: u64| {
             command::wkhtmltopdf(
                 &[
@@ -69,6 +67,9 @@ impl PdfTools {
             )
         };
 
+        let page_chunk_height = 40;
+        let page_margin = 10;
+
         // Create PDF file with small pages to have an idea what the size on the whole page
         generate_file(page_chunk_height, 0)?;
 
@@ -83,27 +84,29 @@ impl PdfTools {
 
             pages = Self::get_pages_count(&output_path)? as _;
 
+            println!("{output_path} shrink. Size {new_page_height}mm. Pages {pages}");
+
             if pages == 1 {
                 new_page_height -= page_chunk_height;
             }
-
-            println!("{} dec {} {}", output_path, new_page_height, pages);
         }
 
         // Increase size by small steps to fit all content in one page
         loop {
-            pages = Self::get_pages_count(&output_path)? as _;
-
             if pages == 1 {
                 break;
             }
 
-            generate_file(new_page_height, page_margin)?;
-
             new_page_height += 10;
 
-            println!("{} inc {} {}", output_path, new_page_height, pages);
+            generate_file(new_page_height, page_margin)?;
+
+            pages = Self::get_pages_count(&output_path)? as _;
+
+            println!("{output_path} expand. Size {new_page_height}mm. Pages {pages}");
         }
+
+        println!("{output_path} ready. Size {new_page_height}mm. Pages {pages}");
 
         Ok(output_path)
     }
