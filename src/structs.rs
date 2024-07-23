@@ -143,22 +143,35 @@ pub struct TocItem<'a> {
     pub record: &'a Record,
 }
 
+type Temp = Box<dyn AsRef<Path> + Sync + Send>;
+
 pub struct App {
-    tmp_img: Box<dyn AsRef<Path> + Sync + Send>,
-    tmp_html: Box<dyn AsRef<Path> + Sync + Send>,
-    tmp_label: Box<dyn AsRef<Path> + Sync + Send>,
+    tmp_img: Temp,
+    tmp_html: Temp,
+    tmp_label: Temp,
     export_path: String,
 }
 
+const PRESERVE_TMP_AFTER_COMPLETE: bool = true;
+
 impl App {
+    fn generate_tmp(name: &str) -> eyre::Result<Temp> {
+        let name = format!("tmp_medpac_{}", name);
+
+        let tmp: Temp = if PRESERVE_TMP_AFTER_COMPLETE {
+            Box::new(TempDir::new(&name)?.into_path())
+        } else {
+            Box::new(TempDir::new(&name)?)
+        };
+
+        Ok(tmp)
+    }
+
     pub fn new(export_path: &str) -> eyre::Result<Self> {
         Ok(Self {
-            // tmp_img: Box::new(TempDir::new("tmp_img")?),
-            // tmp_html: Box::new(TempDir::new("tmp_html")?),
-            // tmp_label: Box::new(TempDir::new("tmp_label")?),
-            tmp_img: Box::new(TempDir::new("tmp_img")?.into_path()),
-            tmp_html: Box::new(TempDir::new("tmp_html")?.into_path()),
-            tmp_label: Box::new(TempDir::new("tmp_label")?.into_path()),
+            tmp_img: Self::generate_tmp("img")?,
+            tmp_html: Self::generate_tmp("html")?,
+            tmp_label: Self::generate_tmp("label")?,
             export_path: export_path.trim_end_matches('/').into(),
         })
     }
