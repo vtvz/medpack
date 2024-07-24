@@ -12,13 +12,12 @@ pub struct App {
     export_path: String,
 }
 
-const PRESERVE_TMP_AFTER_COMPLETE: bool = true;
-
 impl App {
     fn generate_tmp(name: &str) -> eyre::Result<Temp> {
         let name = format!("tmp_medpac_{}", name);
+        let preserve = std::env::var("PRESERVE_TMP").is_ok();
 
-        let tmp: Temp = if PRESERVE_TMP_AFTER_COMPLETE {
+        let tmp: Temp = if preserve {
             Box::new(TempDir::new(&name)?.into_path())
         } else {
             Box::new(TempDir::new(&name)?)
