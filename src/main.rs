@@ -199,13 +199,25 @@ fn process_record<'a>(app: &App, rec: &'a Record) -> eyre::Result<(Vec<String>, 
 }
 
 fn generate_toc_file(app: &App, person_name: &str, toc: Toc) -> eyre::Result<String> {
-    let shift = 1;
+    let mut shift = 1;
 
-    let output_path = PdfTools::from_html(
-        app,
-        "toc-".to_string() + person_name,
-        &toc.generate_html(shift),
-    )?;
+    let unadaptive = std::env::var("UNADAPTIVE_TEXT_PAGES").is_ok();
+
+    let mut output_path = "".into();
+
+    for _ in 0..2 {
+        output_path = PdfTools::from_html(
+            app,
+            "toc-".to_string() + person_name,
+            &toc.generate_html(shift),
+        )?;
+
+        shift = PdfTools::get_pages_count(&output_path)?;
+
+        if !unadaptive {
+            break;
+        }
+    }
 
     Ok(output_path)
 }

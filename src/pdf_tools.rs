@@ -67,8 +67,15 @@ impl PdfTools {
             )
         };
 
-        let page_chunk_height = 40;
         let page_margin = 10;
+
+        if std::env::var("UNADAPTIVE_TEXT_PAGES").is_ok() {
+            generate_file(297, page_margin)?;
+
+            return Ok(output_path);
+        }
+
+        let page_chunk_height = 40;
 
         // Create PDF file with small pages to have an idea what the size on the whole page
         generate_file(page_chunk_height, 0)?;
