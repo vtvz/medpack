@@ -10,16 +10,18 @@ use rayon::iter::{
     IntoParallelRefIterator,
     ParallelIterator,
 };
-use regex::Regex;
-use structs::{Export, Message, Record, TocItem};
+use structs::{Export, Message, Record};
 
-use crate::command::{img2pdf, pdf_info, pdfunite};
-use crate::pdf_tools::text_to_pdf;
-use crate::structs::App;
+use crate::app::App;
+use crate::command::{img2pdf, pdfunite};
+use crate::pdf_tools::PdfTools;
+use crate::toc::{Toc, TocItem};
 
+mod app;
 mod command;
 mod pdf_tools;
 mod structs;
+mod toc;
 
 fn group_to_record(group: Vec<Message>) -> Record {
     let mut record = group
@@ -73,21 +75,6 @@ fn group_messages(mut msgs: Vec<Message>) -> Vec<Record> {
     result
 }
 
-fn get_pdf_pages(path: &str) -> eyre::Result<u8> {
-    let out = pdf_info(path)?;
-    let re = Regex::new(r"(?m)^Pages:\s+(\d+)$")?;
-
-    let cap = re.captures(&out).ok_or(eyre::eyre!("Need captures"))?;
-
-    let page = cap
-        .get(1)
-        .ok_or(eyre::eyre!("Need 1 capture"))?
-        .as_str()
-        .parse()?;
-
-    Ok(page)
-}
-
 fn get_export_result(path: impl AsRef<Path>) -> eyre::Result<Export> {
     let red = String::from_utf8(fs::read(path)?)?;
     let data: structs::Export = serde_json::from_str(&red)?;
@@ -107,8 +94,8 @@ fn main() -> eyre::Result<()> {
 fn app() -> eyre::Result<()> {
     let args: Vec<_> = std::env::args().collect();
 
-    let export_path = args.get(1).expect("must provide path to exported data");
-    let app = App::new(export_path)?;
+    let export_path = args.get(1).cloned().unwrap_or(".".into());
+    let app = App::new(&export_path)?;
 
     let data = get_export_result(format!("{export_path}/result.json"))?;
 
@@ -142,6 +129,7 @@ fn app() -> eyre::Result<()> {
 
     let result: Result<Vec<_>, _> = collection
         .into_par_iter()
+        // .into_iter()
         .map(|(name, recs)| process_person(&app, &name, &recs))
         .collect();
 
@@ -154,7 +142,6 @@ fn process_message(app: &App, msg: &Message) -> eyre::Result<String> {
     let path = if msg.is_pdf() {
         format!("{}/{}", app.export_path(), msg.unwrap_file())
     } else if msg.is_photo() {
-        // img2pdf --imgsize 595x5000 --fit into {} -o "${TMP}/{/.}.img.pdf"
         let path = app.tmp_img(format!("{}.pdf", msg.id));
 
         img2pdf([
@@ -174,7 +161,7 @@ fn process_message(app: &App, msg: &Message) -> eyre::Result<String> {
             .map(|entity| entity.to_html())
             .join("");
 
-        text_to_pdf(app, msg.id, &content)?
+        PdfTools::from_html(app, msg.id, &content)?
     };
 
     Ok(path)
@@ -198,9 +185,9 @@ fn process_record<'a>(app: &App, rec: &'a Record) -> eyre::Result<(Vec<String>, 
         };
 
         let labeled_pdf = app.tmp_label(format!("{}.pdf", msg.id));
-        let labeled_pdf = pdf_tools::label_pdf(&pdf, &labeled_pdf, &paging, &label, msg.id)?;
+        let labeled_pdf = PdfTools::label(&pdf, &labeled_pdf, &paging, &label, msg.id)?;
 
-        pages += get_pdf_pages(&pdf)?;
+        pages += PdfTools::get_pages_count(&pdf)?;
         println!("  - {labeled_pdf}");
 
         pdfs.push(labeled_pdf);
@@ -211,50 +198,14 @@ fn process_record<'a>(app: &App, rec: &'a Record) -> eyre::Result<(Vec<String>, 
     Ok((pdfs, toc_items))
 }
 
-fn generate_toc_file(app: &App, toc_items: &[TocItem]) -> eyre::Result<String> {
-    let mut shift = 0;
-    let mut output_path = "".into();
+fn generate_toc_file(app: &App, person_name: &str, toc: Toc) -> eyre::Result<String> {
+    let shift = 1;
 
-    for _ in 0..2 {
-        let mut current_page = shift;
-        let content = toc_items
-            .iter()
-            .map(|item| {
-                current_page += item.pages;
-                format!(
-                    r#"
-                    <tr>
-                        <td>{}</td>
-                        <td style="width: 100%"><ul><li>{}</li></ul></td>
-                        <td style="text-align: right"> {}</td>
-                    </tr>
-                    "#,
-                    item.record.date,
-                    item.record.tags.join("</li><li>"),
-                    current_page - item.pages + 1,
-                )
-            })
-            .join("");
-
-        output_path = text_to_pdf(
-            app,
-            "toc",
-            &format!(
-                r#"
-                <table class="table table-striped table-sm">
-                    <tr class="thead-dark">
-                        <th style="text-align: left">date</th>
-                        <th style="width: 100%; text-align: left">info</th>
-                        <th style="text-align: right">#</th>
-                    </tr>
-                    {content}
-                </table>
-                "#
-            ),
-        )?;
-
-        shift = get_pdf_pages(&output_path)?;
-    }
+    let output_path = PdfTools::from_html(
+        app,
+        "toc-".to_string() + person_name,
+        &toc.generate_html(shift),
+    )?;
 
     Ok(output_path)
 }
@@ -264,6 +215,7 @@ fn process_person(app: &App, name: &str, recs: &[Record]) -> eyre::Result<()> {
 
     let results = recs
         .par_iter()
+        // .iter()
         .enumerate()
         .map(|(i, rec)| {
             println!("{} - {} of {}", name, i + 1, recs.len());
@@ -275,9 +227,11 @@ fn process_person(app: &App, name: &str, recs: &[Record]) -> eyre::Result<()> {
     let (pdfs, toc_items): (Vec<_>, Vec<_>) = results.into_iter().unzip();
 
     let mut pdfs = pdfs.into_iter().flatten().collect_vec();
-    let toc_items = toc_items.into_iter().flatten().collect_vec();
 
-    let toc_path = generate_toc_file(app, &toc_items)?;
+    let mut toc = Toc::new();
+    toc_items.into_iter().for_each(|item| toc.append(item));
+
+    let toc_path = generate_toc_file(app, name, toc)?;
 
     pdfs.insert(0, toc_path);
 

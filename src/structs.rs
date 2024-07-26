@@ -1,8 +1,5 @@
-use std::fmt::Display;
-
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
-use tempdir::TempDir;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -135,54 +132,4 @@ pub struct Record {
     pub person: String,
     #[serde(default)]
     pub messages: Vec<Message>,
-}
-
-pub struct TocItem<'a> {
-    pub pages: u8,
-    pub record: &'a Record,
-}
-
-pub struct App {
-    tmp_img: TempDir,
-    tmp_html: TempDir,
-    tmp_label: TempDir,
-    export_path: String,
-}
-
-impl App {
-    pub fn new(export_path: &str) -> eyre::Result<Self> {
-        Ok(Self {
-            tmp_img: TempDir::new("tmp_img")?,
-            tmp_html: TempDir::new("tmp_html")?,
-            tmp_label: TempDir::new("tmp_label")?,
-            export_path: export_path.trim_end_matches('/').into(),
-        })
-    }
-
-    fn tmp_file(tmp: &TempDir, file: impl Display) -> String {
-        let tmp = tmp
-            .path()
-            .to_path_buf()
-            .into_os_string()
-            .into_string()
-            .unwrap();
-
-        format!("{}/{}", tmp, file)
-    }
-
-    pub fn tmp_img(&self, file: impl Display) -> String {
-        Self::tmp_file(&self.tmp_img, file)
-    }
-
-    pub fn tmp_html(&self, file: impl Display) -> String {
-        Self::tmp_file(&self.tmp_html, file)
-    }
-
-    pub fn tmp_label(&self, file: impl Display) -> String {
-        Self::tmp_file(&self.tmp_label, file)
-    }
-
-    pub fn export_path(&self) -> &str {
-        &self.export_path
-    }
 }
