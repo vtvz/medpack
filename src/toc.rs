@@ -31,16 +31,19 @@ impl<'a> Toc<'a> {
         let content = self
             .items
             .iter()
-            .map(|item| {
+            .enumerate()
+            .map(|(index, item)| {
                 current_page += item.pages;
                 format!(
                     r#"
                 <tr>
                     <td>{}</td>
+                    <td>{}</td>
                     <td style="width: 100%"><ul><li>{}</li></ul></td>
                     <td style="text-align: right"> {}</td>
                 </tr>
                 "#,
+                    index + 1,
                     item.record.date,
                     item.record.tags.join("</li><li>"),
                     current_page - item.pages + 1,
@@ -52,6 +55,7 @@ impl<'a> Toc<'a> {
             r#"
             <table class="table table-striped table-sm">
                 <tr class="thead-dark">
+                    <th style="text-align: left">#</th>
                     <th style="text-align: left">date</th>
                     <th style="width: 100%; text-align: left">info</th>
                     <th style="text-align: right">#</th>
