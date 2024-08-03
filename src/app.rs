@@ -9,7 +9,7 @@ pub struct App {
     tmp_img: Temp,
     tmp_html: Temp,
     tmp_label: Temp,
-    export_path: String,
+    export_paths: Vec<String>,
 }
 
 impl App {
@@ -26,12 +26,15 @@ impl App {
         Ok(tmp)
     }
 
-    pub fn new(export_path: &str) -> eyre::Result<Self> {
+    pub fn new<'a>(export_paths: &'a [&'a str]) -> eyre::Result<Self> {
         Ok(Self {
             tmp_img: Self::generate_tmp("img")?,
             tmp_html: Self::generate_tmp("html")?,
             tmp_label: Self::generate_tmp("label")?,
-            export_path: export_path.trim_end_matches('/').into(),
+            export_paths: export_paths
+                .into_iter()
+                .map(|export_path| export_path.trim_end_matches('/').into())
+                .collect(),
         })
     }
 
@@ -58,7 +61,7 @@ impl App {
         Self::tmp_file(self.tmp_label.as_ref(), file)
     }
 
-    pub fn export_path(&self) -> &str {
-        &self.export_path
+    pub fn export_path(&self) -> &[String] {
+        &self.export_paths
     }
 }

@@ -94,8 +94,8 @@ fn main() -> eyre::Result<()> {
 fn app() -> eyre::Result<()> {
     let args: Vec<_> = std::env::args().collect();
 
-    let export_path = args.get(1).cloned().unwrap_or(".".into());
-    let app = App::new(&export_path)?;
+    let export_paths = if args.len() == 0 { vec![] } else { args };
+    let app = App::new(&export_paths)?;
 
     let data = get_export_result(format!("{export_path}/result.json"))?;
 
