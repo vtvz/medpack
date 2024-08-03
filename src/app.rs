@@ -26,7 +26,7 @@ impl App {
         Ok(tmp)
     }
 
-    pub fn new<'a>(export_paths: &'a [&'a str]) -> eyre::Result<Self> {
+    pub fn new<'a>(export_paths: &'a [String]) -> eyre::Result<Self> {
         Ok(Self {
             tmp_img: Self::generate_tmp("img")?,
             tmp_html: Self::generate_tmp("html")?,
