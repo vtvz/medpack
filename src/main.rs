@@ -38,28 +38,42 @@ fn group_to_record(group: Vec<Message>) -> Record {
 fn group_messages(mut msgs: Vec<Message>) -> Vec<Record> {
     msgs.sort_by_key(|msg| msg.id);
 
+    // Group is a collection of related messages
     let mut group: Vec<Message> = vec![];
-    let mut result = vec![];
+    let mut records = vec![];
     let mut continue_group = false;
 
     for msg in msgs {
-        let mut to_push = false;
-        let mut close_prev = false;
+        // Will this messages be pushed to group
+        let to_push;
 
+        // If true will create record with grouped messages
+        // `group` variable will be emptied
+        let close_prev;
+
+        // Record in msg is an `yaml` block with metadata
         if msg.has_record() {
             to_push = true;
             close_prev = true;
 
+            // Image with record could have following image
             continue_group = msg.is_photo();
         } else if msg.is_photo() && msg.is_text_empty() && continue_group {
+            // Image without record can be a part of group
+            // True if group continues
             to_push = true;
+            close_prev = false;
         } else {
-            continue_group = false;
+            // Only images can create group.
+            // Text and PDFs without Record won't be added to document
+            to_push = false;
             close_prev = true;
+
+            continue_group = false;
         }
 
         if close_prev && !group.is_empty() {
-            result.push(group_to_record(group));
+            records.push(group_to_record(group));
             group = vec![];
         }
 
@@ -69,10 +83,10 @@ fn group_messages(mut msgs: Vec<Message>) -> Vec<Record> {
     }
 
     if !group.is_empty() {
-        result.push(group_to_record(group));
+        records.push(group_to_record(group));
     }
 
-    result
+    records
 }
 
 fn get_export_result(export_path: &str) -> eyre::Result<Export> {
@@ -108,20 +122,24 @@ fn app() -> eyre::Result<()> {
         args
     };
 
-    let export_path = export_paths.first().unwrap();
-
     let app = App::new()?;
-    let data = get_export_result(export_path)?;
 
-    let mut json = data
-        .messages
+    let exports = export_paths
+        .iter()
+        .map(|path| get_export_result(path))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let messages = exports
         .into_iter()
+        .flat_map(|export| export.messages)
         .filter(|msg| msg.type_field == "message" && msg.contact_information.is_none())
+        .sorted_by_key(|msg| (msg.id, msg.date, msg.edited.unwrap_or_default()))
+        .rev()
+        .dedup_by(|a, b| a.id == b.id)
         .collect_vec();
 
-    json.sort_by_key(|msg| msg.id);
-
-    let grouped_by_topic = json
+    // I do this for consistency as messages in different topics can interfere with each other
+    let grouped_by_topic = messages
         .into_iter()
         .map(|msg| (msg.reply_to_message_id, msg))
         .into_group_map();
