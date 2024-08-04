@@ -99,12 +99,19 @@ fn main() -> eyre::Result<()> {
 }
 
 fn app() -> eyre::Result<()> {
-    let args: Vec<_> = std::env::args().collect();
+    let args: Vec<_> = std::env::args().skip(1).collect();
 
-    let export_path = args.get(1).cloned().unwrap_or(".".into());
-    // let export_paths = if args.len() == 0 { vec![] } else { args };
+    // let export_path = args.get(1).cloned().unwrap_or(".".into());
+    let export_paths = if args.is_empty() {
+        vec![".".to_string()]
+    } else {
+        args
+    };
+
+    let export_path = export_paths.first().unwrap();
+
     let app = App::new()?;
-    let data = get_export_result(&export_path)?;
+    let data = get_export_result(export_path)?;
 
     let mut json = data
         .messages

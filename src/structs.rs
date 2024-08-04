@@ -65,7 +65,7 @@ pub struct Message {
     pub forwarded_from: Option<String>,
     pub reply_to_message_id: Option<i64>,
     pub text_entities: Vec<TextEntity>,
-    pub edited: Option<String>,
+    pub edited: Option<NaiveDateTime>,
     pub edited_unixtime: Option<String>,
     pub file: Option<String>,
     pub thumbnail: Option<String>,
