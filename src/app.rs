@@ -1,5 +1,4 @@
-use std::fmt::Display;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use tempdir::TempDir;
 
@@ -9,7 +8,6 @@ pub struct App {
     tmp_img: Temp,
     tmp_html: Temp,
     tmp_label: Temp,
-    export_paths: Vec<String>,
 }
 
 impl App {
@@ -26,42 +24,31 @@ impl App {
         Ok(tmp)
     }
 
-    pub fn new<'a>(export_paths: &'a [String]) -> eyre::Result<Self> {
+    pub fn new() -> eyre::Result<Self> {
         Ok(Self {
             tmp_img: Self::generate_tmp("img")?,
             tmp_html: Self::generate_tmp("html")?,
             tmp_label: Self::generate_tmp("label")?,
-            export_paths: export_paths
-                .into_iter()
-                .map(|export_path| export_path.trim_end_matches('/').into())
-                .collect(),
         })
     }
 
-    fn tmp_file(tmp: impl AsRef<Path>, file: impl Display) -> String {
-        let tmp = tmp
-            .as_ref()
-            .to_path_buf()
-            .into_os_string()
-            .into_string()
-            .unwrap();
+    fn tmp_file(tmp: impl AsRef<Path>, file: impl AsRef<Path>) -> PathBuf {
+        let mut tmp = tmp.as_ref().to_path_buf();
 
-        format!("{}/{}", tmp, file)
+        tmp.push(file);
+
+        tmp
     }
 
-    pub fn tmp_img(&self, file: impl Display) -> String {
+    pub fn tmp_img(&self, file: impl AsRef<Path>) -> PathBuf {
         Self::tmp_file(self.tmp_img.as_ref(), file)
     }
 
-    pub fn tmp_html(&self, file: impl Display) -> String {
+    pub fn tmp_html(&self, file: impl AsRef<Path>) -> PathBuf {
         Self::tmp_file(self.tmp_html.as_ref(), file)
     }
 
-    pub fn tmp_label(&self, file: impl Display) -> String {
+    pub fn tmp_label(&self, file: impl AsRef<Path>) -> PathBuf {
         Self::tmp_file(self.tmp_label.as_ref(), file)
-    }
-
-    pub fn export_path(&self) -> &[String] {
-        &self.export_paths
     }
 }

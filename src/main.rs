@@ -1,6 +1,6 @@
 #![feature(exit_status_error)]
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 
 use eyre::Ok;
 use itertools::Itertools;
@@ -75,9 +75,16 @@ fn group_messages(mut msgs: Vec<Message>) -> Vec<Record> {
     result
 }
 
-fn get_export_result(path: impl AsRef<Path>) -> eyre::Result<Export> {
-    let red = String::from_utf8(fs::read(path)?)?;
-    let data: structs::Export = serde_json::from_str(&red)?;
+fn get_export_result(export_path: &str) -> eyre::Result<Export> {
+    let result_json = &format!("{export_path}/result.json");
+
+    let red = String::from_utf8(fs::read(result_json)?)?;
+    let mut data: structs::Export = serde_json::from_str(&red)?;
+
+    data.messages
+        .iter_mut()
+        .for_each(|msg| msg.export_path = Some(export_path.into()));
+
     Ok(data)
 }
 
@@ -94,10 +101,10 @@ fn main() -> eyre::Result<()> {
 fn app() -> eyre::Result<()> {
     let args: Vec<_> = std::env::args().collect();
 
-    let export_paths = if args.len() == 0 { vec![] } else { args };
-    let app = App::new(&export_paths)?;
-
-    let data = get_export_result(format!("{export_path}/result.json"))?;
+    let export_path = args.get(1).cloned().unwrap_or(".".into());
+    // let export_paths = if args.len() == 0 { vec![] } else { args };
+    let app = App::new()?;
+    let data = get_export_result(&export_path)?;
 
     let mut json = data
         .messages
@@ -122,9 +129,9 @@ fn app() -> eyre::Result<()> {
 
     println!(
         "{tmp_html} {tmp_img} {tmp_label}",
-        tmp_html = app.tmp_html(""),
-        tmp_label = app.tmp_label(""),
-        tmp_img = app.tmp_img(""),
+        tmp_html = app.tmp_html("").to_string_lossy(),
+        tmp_label = app.tmp_label("").to_string_lossy(),
+        tmp_img = app.tmp_img("").to_string_lossy(),
     );
 
     let result: Result<Vec<_>, _> = collection
@@ -138,9 +145,9 @@ fn app() -> eyre::Result<()> {
     Ok(())
 }
 
-fn process_message(app: &App, msg: &Message) -> eyre::Result<String> {
+fn process_message(app: &App, msg: &Message) -> eyre::Result<PathBuf> {
     let path = if msg.is_pdf() {
-        format!("{}/{}", app.export_path(), msg.unwrap_file())
+        msg.unwrap_file()
     } else if msg.is_photo() {
         let path = app.tmp_img(format!("{}.pdf", msg.id));
 
@@ -149,9 +156,9 @@ fn process_message(app: &App, msg: &Message) -> eyre::Result<String> {
             "595x5000",
             "--fit",
             "into",
-            &format!("{}/{}", app.export_path(), msg.unwrap_photo()),
+            &msg.unwrap_photo().to_string_lossy(),
             "-o",
-            &path,
+            &path.to_string_lossy(),
         ])?;
 
         path
@@ -167,7 +174,10 @@ fn process_message(app: &App, msg: &Message) -> eyre::Result<String> {
     Ok(path)
 }
 
-fn process_record<'a>(app: &App, rec: &'a Record) -> eyre::Result<(Vec<String>, Vec<TocItem<'a>>)> {
+fn process_record<'a>(
+    app: &App,
+    rec: &'a Record,
+) -> eyre::Result<(Vec<PathBuf>, Vec<TocItem<'a>>)> {
     let mut pdfs = vec![];
     let mut toc_items = vec![];
     let mut pages = 0;
@@ -188,7 +198,10 @@ fn process_record<'a>(app: &App, rec: &'a Record) -> eyre::Result<(Vec<String>, 
         let labeled_pdf = PdfTools::label(&pdf, &labeled_pdf, &paging, &label, msg.id)?;
 
         pages += PdfTools::get_pages_count(&pdf)?;
-        println!("  - {labeled_pdf}");
+        println!(
+            "  - {labeled_pdf}",
+            labeled_pdf = labeled_pdf.to_string_lossy()
+        );
 
         pdfs.push(labeled_pdf);
     }
@@ -198,7 +211,7 @@ fn process_record<'a>(app: &App, rec: &'a Record) -> eyre::Result<(Vec<String>, 
     Ok((pdfs, toc_items))
 }
 
-fn generate_toc_file(app: &App, person_name: &str, toc: Toc) -> eyre::Result<String> {
+fn generate_toc_file(app: &App, person_name: &str, toc: Toc) -> eyre::Result<PathBuf> {
     let mut shift = 1;
 
     let mut output_path = "".into();
@@ -250,7 +263,7 @@ fn process_person(app: &App, name: &str, recs: &[Record]) -> eyre::Result<()> {
     // Output file as last parameter
     let result_pdf = format!("{}.pdf", name);
 
-    pdfs.push(result_pdf.clone());
+    pdfs.push(result_pdf.clone().into());
 
     pdfunite(pdfs)?;
 

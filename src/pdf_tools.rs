@@ -1,5 +1,6 @@
 use std::fmt::Display;
 use std::fs;
+use std::path::{Path, PathBuf};
 
 use eyre::Ok;
 use regex::Regex;
@@ -10,7 +11,7 @@ use crate::command::{self, cmd, cpdf};
 pub struct PdfTools;
 
 impl PdfTools {
-    pub fn from_html(app: &App, slug: impl Display, content: &str) -> eyre::Result<String> {
+    pub fn from_html(app: &App, slug: impl Display, content: &str) -> eyre::Result<PathBuf> {
         let bootstrap = include_str!("bootstrap-v4.6.2.min.css");
         let css_style = r#"
         html * {
@@ -91,7 +92,10 @@ impl PdfTools {
 
             pages = Self::get_pages_count(&output_path)? as _;
 
-            println!("{output_path} shrink. Size {new_page_height}mm. Pages {pages}");
+            println!(
+                "{} shrink. Size {new_page_height}mm. Pages {pages}",
+                output_path.to_string_lossy(),
+            );
 
             if pages == 1 {
                 new_page_height -= page_chunk_height;
@@ -110,21 +114,27 @@ impl PdfTools {
 
             pages = Self::get_pages_count(&output_path)? as _;
 
-            println!("{output_path} expand. Size {new_page_height}mm. Pages {pages}");
+            println!(
+                "{} expand. Size {new_page_height}mm. Pages {pages}",
+                output_path.to_string_lossy()
+            );
         }
 
-        println!("{output_path} ready. Size {new_page_height}mm. Pages {pages}");
+        println!(
+            "{} ready. Size {new_page_height}mm. Pages {pages}",
+            output_path.to_string_lossy()
+        );
 
         Ok(output_path)
     }
 
     pub fn label(
-        in_path: &str,
-        out_path: &str,
+        in_path: &Path,
+        out_path: &Path,
         left: impl Display,
         right: impl Display,
         bottom: impl Display,
-    ) -> eyre::Result<String> {
+    ) -> eyre::Result<PathBuf> {
         let text_color = "black";
         let outline_color = "white";
 
@@ -132,7 +142,7 @@ impl PdfTools {
         let font_arg = format!("Roboto={font_path}");
 
         cpdf([
-            in_path,
+            &in_path.to_string_lossy(),
             "-add-text",
             &bottom.to_string(),
             "-bottom",
@@ -204,13 +214,13 @@ impl PdfTools {
             "-color",
             text_color,
             "-o",
-            out_path,
+            &out_path.to_string_lossy(),
         ])?;
 
-        Ok(out_path.into())
+        Ok(out_path.to_path_buf())
     }
 
-    pub fn get_pages_count(path: &str) -> eyre::Result<u8> {
+    pub fn get_pages_count(path: &PathBuf) -> eyre::Result<u8> {
         let out = command::pdf_info(path)?;
         let re = Regex::new(r"(?m)^Pages:\s+(\d+)$")?;
 

@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
@@ -73,6 +75,8 @@ pub struct Message {
     pub height: Option<i64>,
     pub media_type: Option<String>,
     pub duration_seconds: Option<i64>,
+
+    pub export_path: Option<PathBuf>,
 }
 
 impl Message {
@@ -84,9 +88,16 @@ impl Message {
         self.photo.is_some() || self.mime_type == Some("image/jpeg".into())
     }
 
-    pub fn unwrap_photo(&self) -> &str {
+    pub fn unwrap_export_path(&self) -> PathBuf {
+        self.export_path.clone().unwrap()
+    }
+
+    pub fn unwrap_photo(&self) -> PathBuf {
         if let Some(photo) = self.photo.as_ref() {
-            photo
+            let mut export_path = self.unwrap_export_path();
+            export_path.push(photo);
+
+            export_path
         } else if self.mime_type == Some("image/jpeg".into()) {
             self.unwrap_file()
         } else {
@@ -94,8 +105,12 @@ impl Message {
         }
     }
 
-    pub fn unwrap_file(&self) -> &str {
-        self.file.as_ref().unwrap()
+    pub fn unwrap_file(&self) -> PathBuf {
+        let mut export_path = self.unwrap_export_path();
+
+        export_path.push(self.file.as_ref().unwrap());
+
+        export_path
     }
 
     pub fn is_pdf(&self) -> bool {
