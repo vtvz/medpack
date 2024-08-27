@@ -1,18 +1,46 @@
 use std::fmt::Display;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use eyre::Ok;
+use lazy_static::lazy_static;
 use regex::Regex;
+use tempdir::TempDir;
 
 use crate::app::App;
-use crate::command::{self, cmd, cpdf};
+use crate::command;
+
+lazy_static! {
+    static ref TEMP_DIR: TempDir = TempDir::new("tmp_medpack_assets").unwrap();
+    static ref DENO_FILE: PathBuf = {
+        let file_path = TEMP_DIR.path().join("index.ts");
+
+        let mut tmp_file = fs::File::create(file_path.clone()).unwrap();
+        let content = include_bytes!("assets/index.ts");
+
+        tmp_file.write_all(content).unwrap();
+
+        file_path
+    };
+    static ref ROBOTO_FONT_FILE: PathBuf = {
+        let file_path = TEMP_DIR.path().join("Roboto-Regular.ttf");
+
+        let mut tmp_file = fs::File::create(file_path.clone()).unwrap();
+        let content = include_bytes!("./assets/Roboto-Regular.ttf");
+
+        tmp_file.write_all(content).unwrap();
+
+        file_path
+    };
+}
 
 pub struct PdfTools;
 
 impl PdfTools {
     pub fn from_html(app: &App, slug: impl Display, content: &str) -> eyre::Result<PathBuf> {
-        let bootstrap = include_str!("bootstrap-v4.6.2.min.css");
+        let bootstrap = include_str!("assets/bootstrap-v4.6.2.min.css");
+
         let css_style = r#"
         html * {
             font-family: "DejaVu Sans", sans-serif;
@@ -135,86 +163,29 @@ impl PdfTools {
         right: impl Display,
         bottom: impl Display,
     ) -> eyre::Result<PathBuf> {
-        let text_color = "black";
-        let outline_color = "white";
+        // let text_color = "black";
+        // let outline_color = "white";
 
-        let font_path = cmd("fc-list", ["Roboto:style=Regular", "-f", "%{file}"])?;
-        let font_arg = format!("Roboto={font_path}");
+        // let font_path = cmd("fc-list", ["Roboto:style=Regular", "-f", "%{file}"])?;
+        // let font_arg = format!("Roboto={font_path}");
 
-        cpdf([
+        let deno_file = DENO_FILE.to_str().unwrap();
+        let font_path = ROBOTO_FONT_FILE.to_str().unwrap();
+
+        command::deno([
+            deno_file,
+            "-i",
             &in_path.to_string_lossy(),
-            "-add-text",
-            &bottom.to_string(),
-            "-bottom",
-            "5",
-            "-load-ttf",
-            &font_arg,
-            "-font",
-            "Roboto",
-            "-font-size",
-            "5",
-            "-color",
-            "0.5",
-            "AND",
-            "-add-text",
-            &right.to_string(),
-            "-topright",
-            "10 15",
-            "-load-ttf",
-            &font_arg,
-            "-font",
-            "Roboto",
-            "-font-size",
-            "12",
-            "-color",
-            outline_color,
-            "-outline",
-            "-linewidth",
-            "1.5",
-            "AND",
-            "-add-text",
-            &right.to_string(),
-            "-topright",
-            "10 15",
-            "-load-ttf",
-            &font_arg,
-            "-font",
-            "Roboto",
-            "-font-size",
-            "12",
-            "-color",
-            text_color,
-            "AND",
-            "-add-text",
-            &left.to_string(),
-            "-topleft",
-            "10 15",
-            "-load-ttf",
-            &font_arg,
-            "-font",
-            "Roboto",
-            "-font-size",
-            "12",
-            "-color",
-            outline_color,
-            "-outline",
-            "-linewidth",
-            "1",
-            "AND",
-            "-add-text",
-            &left.to_string(),
-            "-topleft",
-            "10 15",
-            "-load-ttf",
-            &font_arg,
-            "-font",
-            "Roboto",
-            "-font-size",
-            "12",
-            "-color",
-            text_color,
             "-o",
             &out_path.to_string_lossy(),
+            "-l",
+            &left.to_string(),
+            "-r",
+            &right.to_string(),
+            "-b",
+            &bottom.to_string(),
+            "-f",
+            font_path,
         ])?;
 
         Ok(out_path.to_path_buf())

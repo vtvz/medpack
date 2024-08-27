@@ -109,7 +109,7 @@ fn main() -> eyre::Result<()> {
 
     println!("{:?}", err);
 
-    Ok(())
+    Err(err)
 }
 
 fn app() -> eyre::Result<()> {

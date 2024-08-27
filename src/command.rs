@@ -1,21 +1,17 @@
 use std::ffi::OsStr;
 use std::process::Command;
 
-use eyre::Ok;
+use eyre::{eyre, Ok};
 
 pub fn cmd(cmd: &str, args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> eyre::Result<String> {
-    // println!("{} {:?}", cmd, args);
-
     let res = Command::new(cmd).args(args).output()?;
-    // println!("{}", String::from_utf8(res.stdout.clone())?);
-    match res.status.exit_ok() {
-        Result::Ok(()) => Ok(String::from_utf8(res.stdout)?),
-        Err(err) => {
-            println!("{}", String::from_utf8(res.stdout)?);
-            println!("{}", String::from_utf8(res.stderr)?);
-            Err(err.into())
-        },
-        // Ok(_) => Ok(String::from_utf8(res.stdout)?),
+
+    if res.status.success() {
+        Ok(String::from_utf8(res.stdout)?)
+    } else {
+        println!("{}", String::from_utf8(res.stdout)?);
+        println!("{}", String::from_utf8(res.stderr)?);
+        Err(eyre!("Exited with exit code {}", res.status))
     }
 }
 
@@ -35,12 +31,6 @@ pub fn pdfunite(
     cmd("pdfunite", pdfs)
 }
 
-pub fn cpdf(
-    args: impl IntoIterator<Item = impl AsRef<OsStr>> + std::fmt::Debug,
-) -> eyre::Result<String> {
-    cmd("cpdf", args)
-}
-
 pub fn wkhtmltopdf(
     args: &[impl AsRef<OsStr> + std::fmt::Debug],
     input: impl AsRef<OsStr>,
@@ -52,4 +42,20 @@ pub fn wkhtmltopdf(
     new_args.push(output.as_ref());
 
     cmd("wkhtmltopdf", new_args)
+}
+
+pub fn deno(
+    args: impl IntoIterator<Item = impl AsRef<OsStr>> + std::fmt::Debug,
+) -> eyre::Result<String> {
+    let mut new_args: Vec<&OsStr> = vec!["run", "--allow-read", "--allow-write"]
+        .into_iter()
+        .map(AsRef::as_ref)
+        .collect();
+
+    // make borrow checker happy
+    let args: Vec<_> = args.into_iter().collect();
+
+    new_args.extend(args.iter().map(|item| item.as_ref()));
+
+    cmd("deno", new_args)
 }
