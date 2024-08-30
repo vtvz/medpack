@@ -3,133 +3,161 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { PDFDocument, PDFFont, PDFPage, rgb } from "npm:pdf-lib@1.17.1";
 import fontkit from "npm:@pdf-lib/fontkit@1.1.1";
 import arg from "npm:arg";
+import process from "node:process";
 
-const FONT_SIZE = 14;
-const TEXT_MARGIN = 4;
-const FONT_MARGIN_HORIZONTAL = 10;
-let FONT_MARGIN_VERTICAL: number;
-let PAGE_MARGIN: number;
-let FONT_HEIGHT: number;
+class Config {
+  outputPath: string = "";
+  inputPath: string = "";
+  rightLext: string = "";
+  leftLext: string = "";
+  bottomText: string = "";
+  fontPath: string = "";
 
-async function run() {
-  const args = arg({
-    "-i": String,
-    "-o": String,
-    "-r": String,
-    "-l": String,
-    "-b": String,
-    "-f": String,
-  });
+  static fromArgs(argv: string[]): Config {
+    const config = new Config();
+    const args = arg({
+      "-i": String,
+      "-o": String,
+      "-r": String,
+      "-l": String,
+      "-b": String,
+      "-f": String,
+    }, { argv });
 
-  const outputPath = args["-o"] as string;
-  const inputPath = args["-i"] as string;
-  const rightLext = args["-r"] as string;
-  const leftLext = args["-l"] as string;
-  const bottomText = args["-b"] as string;
-  const fontPath = args["-f"] as string;
+    config.outputPath = args["-o"] as string;
+    config.inputPath = args["-i"] as string;
+    config.rightLext = args["-r"] as string;
+    config.leftLext = args["-l"] as string;
+    config.bottomText = args["-b"] as string;
+    config.fontPath = args["-f"] as string;
 
-  const existingPdfBytes = readFileSync(inputPath);
-  const pdfDoc = await PDFDocument.load(existingPdfBytes);
+    return config;
+  }
+}
 
-  const pages = pdfDoc.getPages();
+class App {
+  fontSize = 14;
+  textMarginVertical = 4;
+  textMarginHorizontal = 10;
 
-  pdfDoc.registerFontkit(fontkit);
-  const font = await pdfDoc.embedFont(
-    readFileSync(fontPath),
-  );
+  textTopShift = 0;
+  pageTopExtend = 0;
+  fontHeight = 0;
 
-  FONT_HEIGHT = font.heightAtSize(FONT_SIZE);
-  PAGE_MARGIN = FONT_HEIGHT + TEXT_MARGIN * 2;
-  FONT_MARGIN_VERTICAL = FONT_SIZE + TEXT_MARGIN;
+  config: Config;
 
-  pages.map((page, index) => {
-    pages.length;
+  constructor(config: Config) {
+    this.config = config;
+  }
 
-    extendPdfPages(page);
-    drawBox(page);
+  prepare(font: PDFFont) {
+    this.fontHeight = font.heightAtSize(this.fontSize);
+    this.pageTopExtend = this.fontHeight + this.textMarginVertical * 2;
+    this.textTopShift = this.fontSize + this.textMarginVertical;
+  }
 
-    addLeftText(
-      page,
-      font,
-      leftLext
-        .replace("%Page", `${index + 1}`)
-        .replace("%EndPage", `${pages.length}`),
+  async run() {
+    const existingPdfBytes = readFileSync(this.config.inputPath);
+    const pdfDoc = await PDFDocument.load(existingPdfBytes);
+
+    pdfDoc.registerFontkit(fontkit);
+    const font = await pdfDoc.embedFont(
+      readFileSync(this.config.fontPath),
     );
-    addRightText(page, font, rightLext);
-    addCentreBottom(page, font, bottomText);
-  });
 
-  const pdfBytes = await pdfDoc.save();
-  writeFileSync(outputPath, pdfBytes);
+    this.prepare(font);
+
+    const pages = pdfDoc.getPages();
+
+    pages.map((page, index) => {
+      pages.length;
+
+      this.extendPdfPages(page);
+      this.drawBox(page);
+
+      this.addLeftText(
+        page,
+        font,
+        this.config.leftLext
+          .replace("%Page", `${index + 1}`)
+          .replace("%EndPage", `${pages.length}`),
+      );
+      this.addRightText(page, font, this.config.rightLext);
+      this.addCentreBottom(page, font, this.config.bottomText);
+    });
+
+    const pdfBytes = await pdfDoc.save();
+    writeFileSync(this.config.outputPath, pdfBytes);
+  }
+
+  addLeftText(page: PDFPage, font: PDFFont, text: string) {
+    const height = page.getHeight();
+
+    const x = this.textMarginHorizontal;
+    const y = height - this.textTopShift;
+
+    page.drawText(text, {
+      x: x,
+      y: y,
+      size: this.fontSize,
+      font: font,
+      color: rgb(0, 0, 0),
+    });
+  }
+
+  addRightText(page: PDFPage, font: PDFFont, text: string) {
+    const { width, height } = page.getSize();
+
+    const textWidth = font.widthOfTextAtSize(text, this.fontSize);
+    const x = width - textWidth - this.textMarginHorizontal;
+    const y = height - this.textTopShift;
+
+    page.drawText(text, {
+      x: x,
+      y: y,
+      size: this.fontSize,
+      font: font,
+      color: rgb(0, 0, 0),
+    });
+  }
+
+  addCentreBottom(page: PDFPage, font: PDFFont, text: string) {
+    const FONT_SIZE = 5;
+    const { width } = page.getSize();
+
+    const textWidth = font.widthOfTextAtSize(text, FONT_SIZE);
+
+    const x = (width - textWidth) / 2 - this.textMarginHorizontal;
+    const y = 5;
+
+    page.drawText(text, {
+      x: x,
+      y: y,
+      size: FONT_SIZE,
+      font: font,
+      color: rgb(0.5, 0.5, 0.5),
+    });
+  }
+
+  extendPdfPages(page: PDFPage) {
+    const { width, height } = page.getSize();
+
+    page.setSize(width, height + this.pageTopExtend);
+  }
+
+  drawBox(page: PDFPage) {
+    const { width, height } = page.getSize();
+
+    page.drawRectangle({
+      x: 0,
+      y: height - this.pageTopExtend,
+      width: width,
+      height: this.pageTopExtend,
+      color: rgb(236 / 256, 236 / 256, 239 / 256),
+    });
+  }
 }
 
-function addLeftText(page: PDFPage, font: PDFFont, text: string) {
-  const height = page.getHeight();
-
-  const x = FONT_MARGIN_HORIZONTAL;
-  const y = height - FONT_MARGIN_VERTICAL;
-
-  page.drawText(text, {
-    x: x,
-    y: y,
-    size: FONT_SIZE,
-    font: font,
-    color: rgb(0, 0, 0),
-  });
-}
-
-function addRightText(page: PDFPage, font: PDFFont, text: string) {
-  const { width, height } = page.getSize();
-
-  const textWidth = font.widthOfTextAtSize(text, FONT_SIZE);
-  const x = width - textWidth - FONT_MARGIN_HORIZONTAL;
-  const y = height - FONT_MARGIN_VERTICAL;
-
-  page.drawText(text, {
-    x: x,
-    y: y,
-    size: FONT_SIZE,
-    font: font,
-    color: rgb(0, 0, 0),
-  });
-}
-
-function addCentreBottom(page: PDFPage, font: PDFFont, text: string) {
-  const FONT_SIZE = 5;
-  const { width } = page.getSize();
-
-  const textWidth = font.widthOfTextAtSize(text, FONT_SIZE);
-
-  const x = (width - textWidth) / 2 - FONT_MARGIN_HORIZONTAL;
-  const y = 5;
-
-  page.drawText(text, {
-    x: x,
-    y: y,
-    size: FONT_SIZE,
-    font: font,
-    color: rgb(0.5, 0.5, 0.5),
-  });
-}
-
-function extendPdfPages(page: PDFPage) {
-  const { width, height } = page.getSize();
-
-  page.setSize(width, height + PAGE_MARGIN);
-}
-
-function drawBox(page: PDFPage) {
-  const { width, height } = page.getSize();
-
-  page.drawRectangle({
-    x: 0,
-    y: height - PAGE_MARGIN,
-    width: width,
-    height: PAGE_MARGIN,
-    color: rgb(236 / 256, 236 / 256, 239 / 256),
-  });
-}
-
-run()
+(new App(Config.fromArgs(process.argv))).run()
   .then(() => console.log("PDF pages extended successfully!"))
   .catch((err) => console.error("Error extending PDF pages:", err));

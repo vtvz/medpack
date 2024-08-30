@@ -220,7 +220,8 @@ fn process_record<'a>(
         };
 
         let labeled_pdf = app.tmp_label(format!("{}.pdf", msg.id));
-        let labeled_pdf = PdfTools::label(&pdf, &labeled_pdf, &paging, &label, msg.id)?;
+        let labeled_pdf =
+            PdfTools::label(&pdf, &labeled_pdf, &paging, &label, &msg.id.to_string())?;
 
         pages += PdfTools::get_pages_count(&pdf)?;
         println!(

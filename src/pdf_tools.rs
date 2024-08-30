@@ -1,39 +1,12 @@
 use std::fmt::Display;
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use eyre::Ok;
-use lazy_static::lazy_static;
 use regex::Regex;
-use tempdir::TempDir;
 
 use crate::app::App;
-use crate::command;
-
-lazy_static! {
-    static ref TEMP_DIR: TempDir = TempDir::new("tmp_medpack_assets").unwrap();
-    static ref DENO_FILE: PathBuf = {
-        let file_path = TEMP_DIR.path().join("index.ts");
-
-        let mut tmp_file = fs::File::create(file_path.clone()).unwrap();
-        let content = include_bytes!("assets/index.ts");
-
-        tmp_file.write_all(content).unwrap();
-
-        file_path
-    };
-    static ref ROBOTO_FONT_FILE: PathBuf = {
-        let file_path = TEMP_DIR.path().join("Roboto-Regular.ttf");
-
-        let mut tmp_file = fs::File::create(file_path.clone()).unwrap();
-        let content = include_bytes!("./assets/Roboto-Regular.ttf");
-
-        tmp_file.write_all(content).unwrap();
-
-        file_path
-    };
-}
+use crate::command::{self, DenoArgs};
 
 pub struct PdfTools;
 
@@ -159,9 +132,9 @@ impl PdfTools {
     pub fn label(
         in_path: &Path,
         out_path: &Path,
-        left: impl Display,
-        right: impl Display,
-        bottom: impl Display,
+        left_text: &str,
+        right_text: &str,
+        bottom_text: &str,
     ) -> eyre::Result<PathBuf> {
         // let text_color = "black";
         // let outline_color = "white";
@@ -169,24 +142,13 @@ impl PdfTools {
         // let font_path = cmd("fc-list", ["Roboto:style=Regular", "-f", "%{file}"])?;
         // let font_arg = format!("Roboto={font_path}");
 
-        let deno_file = DENO_FILE.to_str().unwrap();
-        let font_path = ROBOTO_FONT_FILE.to_str().unwrap();
-
-        command::deno([
-            deno_file,
-            "-i",
-            &in_path.to_string_lossy(),
-            "-o",
-            &out_path.to_string_lossy(),
-            "-l",
-            &left.to_string(),
-            "-r",
-            &right.to_string(),
-            "-b",
-            &bottom.to_string(),
-            "-f",
-            font_path,
-        ])?;
+        command::deno(DenoArgs {
+            in_path,
+            out_path,
+            left_text,
+            right_text,
+            bottom_text,
+        })?;
 
         Ok(out_path.to_path_buf())
     }
