@@ -1,6 +1,6 @@
 #![feature(exit_status_error)]
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 
 use eyre::Ok;
 use itertools::Itertools;
@@ -38,28 +38,42 @@ fn group_to_record(group: Vec<Message>) -> Record {
 fn group_messages(mut msgs: Vec<Message>) -> Vec<Record> {
     msgs.sort_by_key(|msg| msg.id);
 
+    // Group is a collection of related messages
     let mut group: Vec<Message> = vec![];
-    let mut result = vec![];
+    let mut records = vec![];
     let mut continue_group = false;
 
     for msg in msgs {
-        let mut to_push = false;
-        let mut close_prev = false;
+        // Will this messages be pushed to group
+        let to_push;
 
+        // If true will create record with grouped messages
+        // `group` variable will be emptied
+        let close_prev;
+
+        // Record in msg is an `yaml` block with metadata
         if msg.has_record() {
             to_push = true;
             close_prev = true;
 
+            // Image with record could have following image
             continue_group = msg.is_photo();
         } else if msg.is_photo() && msg.is_text_empty() && continue_group {
+            // Image without record can be a part of group
+            // True if group continues
             to_push = true;
+            close_prev = false;
         } else {
-            continue_group = false;
+            // Only images can create group.
+            // Text and PDFs without Record won't be added to document
+            to_push = false;
             close_prev = true;
+
+            continue_group = false;
         }
 
         if close_prev && !group.is_empty() {
-            result.push(group_to_record(group));
+            records.push(group_to_record(group));
             group = vec![];
         }
 
@@ -69,15 +83,22 @@ fn group_messages(mut msgs: Vec<Message>) -> Vec<Record> {
     }
 
     if !group.is_empty() {
-        result.push(group_to_record(group));
+        records.push(group_to_record(group));
     }
 
-    result
+    records
 }
 
-fn get_export_result(path: impl AsRef<Path>) -> eyre::Result<Export> {
-    let red = String::from_utf8(fs::read(path)?)?;
-    let data: structs::Export = serde_json::from_str(&red)?;
+fn get_export_result(export_path: &str) -> eyre::Result<Export> {
+    let result_json = &format!("{export_path}/result.json");
+
+    let red = String::from_utf8(fs::read(result_json)?)?;
+    let mut data: structs::Export = serde_json::from_str(&red)?;
+
+    data.messages
+        .iter_mut()
+        .for_each(|msg| msg.export_path = Some(export_path.into()));
+
     Ok(data)
 }
 
@@ -88,26 +109,37 @@ fn main() -> eyre::Result<()> {
 
     println!("{:?}", err);
 
-    Ok(())
+    Err(err)
 }
 
 fn app() -> eyre::Result<()> {
-    let args: Vec<_> = std::env::args().collect();
+    let args: Vec<_> = std::env::args().skip(1).collect();
 
-    let export_path = args.get(1).cloned().unwrap_or(".".into());
-    let app = App::new(&export_path)?;
+    // let export_path = args.get(1).cloned().unwrap_or(".".into());
+    let export_paths = if args.is_empty() {
+        vec![".".to_string()]
+    } else {
+        args
+    };
 
-    let data = get_export_result(format!("{export_path}/result.json"))?;
+    let app = App::new()?;
 
-    let mut json = data
-        .messages
+    let exports = export_paths
+        .iter()
+        .map(|path| get_export_result(path))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let messages = exports
         .into_iter()
+        .flat_map(|export| export.messages)
         .filter(|msg| msg.type_field == "message" && msg.contact_information.is_none())
+        .sorted_by_key(|msg| (msg.id, msg.date, msg.edited.unwrap_or_default()))
+        .rev()
+        .dedup_by(|a, b| a.id == b.id)
         .collect_vec();
 
-    json.sort_by_key(|msg| msg.id);
-
-    let grouped_by_topic = json
+    // I do this for consistency as messages in different topics can interfere with each other
+    let grouped_by_topic = messages
         .into_iter()
         .map(|msg| (msg.reply_to_message_id, msg))
         .into_group_map();
@@ -122,9 +154,9 @@ fn app() -> eyre::Result<()> {
 
     println!(
         "{tmp_html} {tmp_img} {tmp_label}",
-        tmp_html = app.tmp_html(""),
-        tmp_label = app.tmp_label(""),
-        tmp_img = app.tmp_img(""),
+        tmp_html = app.tmp_html("").to_string_lossy(),
+        tmp_label = app.tmp_label("").to_string_lossy(),
+        tmp_img = app.tmp_img("").to_string_lossy(),
     );
 
     let result: Result<Vec<_>, _> = collection
@@ -138,9 +170,9 @@ fn app() -> eyre::Result<()> {
     Ok(())
 }
 
-fn process_message(app: &App, msg: &Message) -> eyre::Result<String> {
+fn process_message(app: &App, msg: &Message) -> eyre::Result<PathBuf> {
     let path = if msg.is_pdf() {
-        format!("{}/{}", app.export_path(), msg.unwrap_file())
+        msg.unwrap_file()
     } else if msg.is_photo() {
         let path = app.tmp_img(format!("{}.pdf", msg.id));
 
@@ -149,9 +181,9 @@ fn process_message(app: &App, msg: &Message) -> eyre::Result<String> {
             "595x5000",
             "--fit",
             "into",
-            &format!("{}/{}", app.export_path(), msg.unwrap_photo()),
+            &msg.unwrap_photo().to_string_lossy(),
             "-o",
-            &path,
+            &path.to_string_lossy(),
         ])?;
 
         path
@@ -167,7 +199,10 @@ fn process_message(app: &App, msg: &Message) -> eyre::Result<String> {
     Ok(path)
 }
 
-fn process_record<'a>(app: &App, rec: &'a Record) -> eyre::Result<(Vec<String>, Vec<TocItem<'a>>)> {
+fn process_record<'a>(
+    app: &App,
+    rec: &'a Record,
+) -> eyre::Result<(Vec<PathBuf>, Vec<TocItem<'a>>)> {
     let mut pdfs = vec![];
     let mut toc_items = vec![];
     let mut pages = 0;
@@ -185,10 +220,14 @@ fn process_record<'a>(app: &App, rec: &'a Record) -> eyre::Result<(Vec<String>, 
         };
 
         let labeled_pdf = app.tmp_label(format!("{}.pdf", msg.id));
-        let labeled_pdf = PdfTools::label(&pdf, &labeled_pdf, &paging, &label, msg.id)?;
+        let labeled_pdf =
+            PdfTools::label(&pdf, &labeled_pdf, &paging, &label, &msg.id.to_string())?;
 
         pages += PdfTools::get_pages_count(&pdf)?;
-        println!("  - {labeled_pdf}");
+        println!(
+            "  - {labeled_pdf}",
+            labeled_pdf = labeled_pdf.to_string_lossy()
+        );
 
         pdfs.push(labeled_pdf);
     }
@@ -198,7 +237,7 @@ fn process_record<'a>(app: &App, rec: &'a Record) -> eyre::Result<(Vec<String>, 
     Ok((pdfs, toc_items))
 }
 
-fn generate_toc_file(app: &App, person_name: &str, toc: Toc) -> eyre::Result<String> {
+fn generate_toc_file(app: &App, person_name: &str, toc: Toc) -> eyre::Result<PathBuf> {
     let mut shift = 1;
 
     let mut output_path = "".into();
@@ -250,7 +289,7 @@ fn process_person(app: &App, name: &str, recs: &[Record]) -> eyre::Result<()> {
     // Output file as last parameter
     let result_pdf = format!("{}.pdf", name);
 
-    pdfs.push(result_pdf.clone());
+    pdfs.push(result_pdf.clone().into());
 
     pdfunite(pdfs)?;
 

@@ -1,21 +1,22 @@
 use std::ffi::OsStr;
+use std::fs;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use eyre::Ok;
+use eyre::{eyre, Ok};
+use lazy_static::lazy_static;
+use tempdir::TempDir;
 
 pub fn cmd(cmd: &str, args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> eyre::Result<String> {
-    // println!("{} {:?}", cmd, args);
-
     let res = Command::new(cmd).args(args).output()?;
-    // println!("{}", String::from_utf8(res.stdout.clone())?);
-    match res.status.exit_ok() {
-        Result::Ok(()) => Ok(String::from_utf8(res.stdout)?),
-        Err(err) => {
-            println!("{}", String::from_utf8(res.stdout)?);
-            println!("{}", String::from_utf8(res.stderr)?);
-            Err(err.into())
-        },
-        // Ok(_) => Ok(String::from_utf8(res.stdout)?),
+
+    if res.status.success() {
+        Ok(String::from_utf8(res.stdout)?)
+    } else {
+        println!("{}", String::from_utf8(res.stdout)?);
+        println!("{}", String::from_utf8(res.stderr)?);
+        Err(eyre!("Exited with exit code {}", res.status))
     }
 }
 
@@ -35,12 +36,6 @@ pub fn pdfunite(
     cmd("pdfunite", pdfs)
 }
 
-pub fn cpdf(
-    args: impl IntoIterator<Item = impl AsRef<OsStr>> + std::fmt::Debug,
-) -> eyre::Result<String> {
-    cmd("cpdf", args)
-}
-
 pub fn wkhtmltopdf(
     args: &[impl AsRef<OsStr> + std::fmt::Debug],
     input: impl AsRef<OsStr>,
@@ -52,4 +47,62 @@ pub fn wkhtmltopdf(
     new_args.push(output.as_ref());
 
     cmd("wkhtmltopdf", new_args)
+}
+
+lazy_static! {
+    static ref TEMP_DIR: TempDir = TempDir::new("tmp_medpack_assets").unwrap();
+    static ref DENO_FILE: PathBuf = {
+        let file_path = TEMP_DIR.path().join("index.ts");
+
+        let mut tmp_file = fs::File::create(file_path.clone()).unwrap();
+        let content = include_bytes!("assets/index.ts");
+
+        tmp_file.write_all(content).unwrap();
+
+        file_path
+    };
+    static ref ROBOTO_FONT_FILE: PathBuf = {
+        let file_path = TEMP_DIR.path().join("Roboto-Regular.ttf");
+
+        let mut tmp_file = fs::File::create(file_path.clone()).unwrap();
+        let content = include_bytes!("./assets/Roboto-Regular.ttf");
+
+        tmp_file.write_all(content).unwrap();
+
+        file_path
+    };
+}
+
+pub struct DenoArgs<'a> {
+    pub in_path: &'a Path,
+    pub out_path: &'a Path,
+    pub left_text: &'a str,
+    pub right_text: &'a str,
+    pub bottom_text: &'a str,
+}
+
+pub fn deno(args: DenoArgs) -> eyre::Result<String> {
+    let deno_file = DENO_FILE.to_str().unwrap();
+    let font_path = ROBOTO_FONT_FILE.to_str().unwrap();
+
+    let args = [
+        "run",
+        "--allow-read",
+        "--allow-write",
+        deno_file,
+        "-i",
+        &args.in_path.to_string_lossy(),
+        "-o",
+        &args.out_path.to_string_lossy(),
+        "-l",
+        args.left_text,
+        "-r",
+        args.right_text,
+        "-b",
+        args.bottom_text,
+        "-f",
+        font_path,
+    ];
+
+    cmd("deno", args)
 }

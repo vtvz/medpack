@@ -1,17 +1,19 @@
 use std::fmt::Display;
 use std::fs;
+use std::path::{Path, PathBuf};
 
 use eyre::Ok;
 use regex::Regex;
 
 use crate::app::App;
-use crate::command::{self, cmd, cpdf};
+use crate::command::{self, DenoArgs};
 
 pub struct PdfTools;
 
 impl PdfTools {
-    pub fn from_html(app: &App, slug: impl Display, content: &str) -> eyre::Result<String> {
-        let bootstrap = include_str!("bootstrap-v4.6.2.min.css");
+    pub fn from_html(app: &App, slug: impl Display, content: &str) -> eyre::Result<PathBuf> {
+        let bootstrap = include_str!("assets/bootstrap-v4.6.2.min.css");
+
         let css_style = r#"
         html * {
             font-family: "DejaVu Sans", sans-serif;
@@ -91,7 +93,10 @@ impl PdfTools {
 
             pages = Self::get_pages_count(&output_path)? as _;
 
-            println!("{output_path} shrink. Size {new_page_height}mm. Pages {pages}");
+            println!(
+                "{} shrink. Size {new_page_height}mm. Pages {pages}",
+                output_path.to_string_lossy(),
+            );
 
             if pages == 1 {
                 new_page_height -= page_chunk_height;
@@ -110,107 +115,45 @@ impl PdfTools {
 
             pages = Self::get_pages_count(&output_path)? as _;
 
-            println!("{output_path} expand. Size {new_page_height}mm. Pages {pages}");
+            println!(
+                "{} expand. Size {new_page_height}mm. Pages {pages}",
+                output_path.to_string_lossy()
+            );
         }
 
-        println!("{output_path} ready. Size {new_page_height}mm. Pages {pages}");
+        println!(
+            "{} ready. Size {new_page_height}mm. Pages {pages}",
+            output_path.to_string_lossy()
+        );
 
         Ok(output_path)
     }
 
     pub fn label(
-        in_path: &str,
-        out_path: &str,
-        left: impl Display,
-        right: impl Display,
-        bottom: impl Display,
-    ) -> eyre::Result<String> {
-        let text_color = "black";
-        let outline_color = "white";
+        in_path: &Path,
+        out_path: &Path,
+        left_text: &str,
+        right_text: &str,
+        bottom_text: &str,
+    ) -> eyre::Result<PathBuf> {
+        // let text_color = "black";
+        // let outline_color = "white";
 
-        let font_path = cmd("fc-list", ["Roboto:style=Regular", "-f", "%{file}"])?;
-        let font_arg = format!("Roboto={font_path}");
+        // let font_path = cmd("fc-list", ["Roboto:style=Regular", "-f", "%{file}"])?;
+        // let font_arg = format!("Roboto={font_path}");
 
-        cpdf([
+        command::deno(DenoArgs {
             in_path,
-            "-add-text",
-            &bottom.to_string(),
-            "-bottom",
-            "5",
-            "-load-ttf",
-            &font_arg,
-            "-font",
-            "Roboto",
-            "-font-size",
-            "5",
-            "-color",
-            "0.5",
-            "AND",
-            "-add-text",
-            &right.to_string(),
-            "-topright",
-            "10 15",
-            "-load-ttf",
-            &font_arg,
-            "-font",
-            "Roboto",
-            "-font-size",
-            "12",
-            "-color",
-            outline_color,
-            "-outline",
-            "-linewidth",
-            "1.5",
-            "AND",
-            "-add-text",
-            &right.to_string(),
-            "-topright",
-            "10 15",
-            "-load-ttf",
-            &font_arg,
-            "-font",
-            "Roboto",
-            "-font-size",
-            "12",
-            "-color",
-            text_color,
-            "AND",
-            "-add-text",
-            &left.to_string(),
-            "-topleft",
-            "10 15",
-            "-load-ttf",
-            &font_arg,
-            "-font",
-            "Roboto",
-            "-font-size",
-            "12",
-            "-color",
-            outline_color,
-            "-outline",
-            "-linewidth",
-            "1",
-            "AND",
-            "-add-text",
-            &left.to_string(),
-            "-topleft",
-            "10 15",
-            "-load-ttf",
-            &font_arg,
-            "-font",
-            "Roboto",
-            "-font-size",
-            "12",
-            "-color",
-            text_color,
-            "-o",
             out_path,
-        ])?;
+            left_text,
+            right_text,
+            bottom_text,
+        })?;
 
-        Ok(out_path.into())
+        Ok(out_path.to_path_buf())
     }
 
-    pub fn get_pages_count(path: &str) -> eyre::Result<u8> {
+    pub fn get_pages_count(path: &PathBuf) -> eyre::Result<u8> {
         let out = command::pdf_info(path)?;
         let re = Regex::new(r"(?m)^Pages:\s+(\d+)$")?;
 
