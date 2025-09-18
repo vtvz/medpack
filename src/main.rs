@@ -107,7 +107,7 @@ fn main() -> eyre::Result<()> {
 
     let Err(err) = res else { return Ok(()) };
 
-    println!("{:?}", err);
+    println!("{err:?}");
 
     Err(err)
 }
@@ -210,7 +210,11 @@ fn process_record<'a>(
     for (i, msg) in rec.messages.iter().enumerate() {
         let pdf = process_message(app, msg)?;
 
-        let label = format!("{}: {}", rec.tags.join(", "), &rec.date);
+        let label = format!(
+            "{}...: {}",
+            rec.tags.join(", ").chars().take(55).collect::<String>(),
+            &rec.date
+        );
         // label_pdf(label)?;
 
         let paging = if msg.is_photo() {
@@ -260,7 +264,7 @@ fn generate_toc_file(app: &App, person_name: &str, toc: Toc) -> eyre::Result<Pat
 }
 
 fn process_person(app: &App, name: &str, recs: &[Record]) -> eyre::Result<()> {
-    println!("## Process person {}", name);
+    println!("## Process person {name}");
 
     let results = recs
         .par_iter()
@@ -287,13 +291,13 @@ fn process_person(app: &App, name: &str, recs: &[Record]) -> eyre::Result<()> {
     println!("{name} - Unite {} pdf files", pdfs.len());
 
     // Output file as last parameter
-    let result_pdf = format!("{}.pdf", name);
+    let result_pdf = format!("{name}.pdf");
 
     pdfs.push(result_pdf.clone().into());
 
     pdfunite(pdfs)?;
 
-    println!("{name} - result file {}\n", result_pdf);
+    println!("{name} - result file {result_pdf}\n");
 
     Ok(())
 }

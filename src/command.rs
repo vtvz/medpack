@@ -62,10 +62,10 @@ lazy_static! {
         file_path
     };
     static ref ROBOTO_FONT_FILE: PathBuf = {
-        let file_path = TEMP_DIR.path().join("Roboto-Regular.ttf");
+        let file_path = TEMP_DIR.path().join("font.ttf");
 
         let mut tmp_file = fs::File::create(file_path.clone()).unwrap();
-        let content = include_bytes!("./assets/Roboto-Regular.ttf");
+        let content = include_bytes!("./assets/Roboto-Medium.ttf");
 
         tmp_file.write_all(content).unwrap();
 

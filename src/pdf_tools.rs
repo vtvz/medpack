@@ -24,6 +24,10 @@ impl PdfTools {
             margin: 0;
             padding-left: 30px;
         }
+
+        .small-font {
+            font-size: 0.8em;
+        }
         "#;
 
         let content = format!(
@@ -42,9 +46,9 @@ impl PdfTools {
             "#
         );
 
-        let path = app.tmp_html(format!("{}.html", slug));
+        let path = app.tmp_html(format!("{slug}.html"));
         // let path = format!("test/{}.html", slug);
-        let output_path = app.tmp_html(format!("{}.pdf", slug));
+        let output_path = app.tmp_html(format!("{slug}.pdf"));
 
         fs::write(&path, content).expect("Should have been able to read the file");
 
@@ -58,11 +62,11 @@ impl PdfTools {
                     "--page-width",
                     "210mm",
                     "--page-height",
-                    &format!("{}mm", height),
+                    &format!("{height}mm"),
                     "-T",
-                    &format!("{}mm", margin),
+                    &format!("{margin}mm"),
                     "-B",
-                    &format!("{}mm", margin),
+                    &format!("{margin}mm"),
                 ],
                 &path,
                 &output_path,

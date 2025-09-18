@@ -15,14 +15,17 @@ class Config {
 
   static fromArgs(argv: string[]): Config {
     const config = new Config();
-    const args = arg({
-      "-i": String,
-      "-o": String,
-      "-r": String,
-      "-l": String,
-      "-b": String,
-      "-f": String,
-    }, { argv });
+    const args = arg(
+      {
+        "-i": String,
+        "-o": String,
+        "-r": String,
+        "-l": String,
+        "-b": String,
+        "-f": String,
+      },
+      { argv },
+    );
 
     config.outputPath = args["-o"] as string;
     config.inputPath = args["-i"] as string;
@@ -38,7 +41,7 @@ class Config {
 class App {
   fontSize = 14;
   textMarginVertical = 4;
-  textMarginHorizontal = 10;
+  textMarginHorizontal = 12;
 
   textTopShift = 0;
   pageTopExtend = 0;
@@ -61,9 +64,7 @@ class App {
     const pdfDoc = await PDFDocument.load(existingPdfBytes);
 
     pdfDoc.registerFontkit(fontkit);
-    const font = await pdfDoc.embedFont(
-      readFileSync(this.config.fontPath),
-    );
+    const font = await pdfDoc.embedFont(readFileSync(this.config.fontPath));
 
     this.prepare(font);
 
@@ -158,6 +159,7 @@ class App {
   }
 }
 
-(new App(Config.fromArgs(process.argv))).run()
+new App(Config.fromArgs(process.argv))
+  .run()
   .then(() => console.log("PDF pages extended successfully!"))
   .catch((err) => console.error("Error extending PDF pages:", err));

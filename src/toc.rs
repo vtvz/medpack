@@ -36,17 +36,33 @@ impl<'a> Toc<'a> {
                 current_page += item.pages;
                 format!(
                     r#"
-                <tr>
-                    <td>{}</td>
-                    <td>{}</td>
-                    <td style="width: 100%"><ul><li>{}</li></ul></td>
-                    <td style="text-align: right"> {}</td>
-                </tr>
-                "#,
-                    index + 1,
-                    item.record.date,
-                    item.record.tags.join("</li><li>"),
-                    current_page - item.pages + 1,
+                        <tr>
+                            <td>{index}</td>
+                            <td>{date}</td>
+                            <td style="width: 100%">
+                                {place}
+                                <ul><li>{tags}</li></ul>
+                                {doctor}
+                            </td>
+                            <td style="text-align: right">{page}</td>
+                        </tr>
+                    "#,
+                    index = index + 1,
+                    date = item.record.date,
+                    tags = item.record.tags.join("</li><li>"),
+                    place = item
+                        .record
+                        .place
+                        .as_ref()
+                        .map(|place| format!("<div class='small-font'>{place}</div>"))
+                        .unwrap_or_default(),
+                    doctor = item
+                        .record
+                        .doctor
+                        .as_ref()
+                        .map(|doctor| format!("<div class='small-font'>{doctor}</div>"))
+                        .unwrap_or_default(),
+                    page = current_page - item.pages + 1,
                 )
             })
             .join("");

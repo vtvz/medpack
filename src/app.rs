@@ -12,7 +12,7 @@ pub struct App {
 
 impl App {
     fn generate_tmp(name: &str) -> eyre::Result<Temp> {
-        let name = format!("tmp_medpack_{}", name);
+        let name = format!("tmp_medpack_{name}");
         let preserve = std::env::var("PRESERVE_TMP").is_ok();
 
         let tmp: Temp = if preserve {

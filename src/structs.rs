@@ -79,6 +79,17 @@ pub struct Message {
     pub export_path: Option<PathBuf>,
 }
 
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Record {
+    pub date: String,
+    pub tags: Vec<String>,
+    pub person: String,
+    #[serde(default)]
+    pub messages: Vec<Message>,
+    pub doctor: Option<String>,
+    pub place: Option<String>,
+}
+
 impl Message {
     pub fn is_text_empty(&self) -> bool {
         self.text_entities.is_empty()
@@ -138,13 +149,4 @@ impl Message {
             Err(err) => Err(err.into()),
         }
     }
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Record {
-    pub date: String,
-    pub tags: Vec<String>,
-    pub person: String,
-    #[serde(default)]
-    pub messages: Vec<Message>,
 }
