@@ -161,7 +161,7 @@ fn app() -> eyre::Result<()> {
 
     let result: Result<Vec<_>, _> = collection
         .into_par_iter()
-        // .into_iter()
+        // .take_any(1)
         .map(|(name, recs)| process_person(&app, &name, &recs))
         .collect();
 

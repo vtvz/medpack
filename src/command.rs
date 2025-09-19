@@ -9,7 +9,10 @@ use lazy_static::lazy_static;
 use tempdir::TempDir;
 
 pub fn cmd(cmd: &str, args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> eyre::Result<String> {
-    let res = Command::new(cmd).args(args).output()?;
+    let mut cmd = Command::new(cmd);
+    cmd.args(args);
+
+    let res = cmd.output()?;
 
     if res.status.success() {
         Ok(String::from_utf8(res.stdout)?)
@@ -65,7 +68,7 @@ lazy_static! {
 
         file_path
     };
-    static ref ROBOTO_FONT_FILE: PathBuf = {
+    pub static ref ROBOTO_FONT_FILE: PathBuf = {
         let file_path = TEMP_DIR.path().join("font.ttf");
 
         let mut tmp_file = fs::File::create(file_path.clone()).unwrap();

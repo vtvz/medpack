@@ -6,7 +6,7 @@ use eyre::Ok;
 use regex::Regex;
 
 use crate::app::App;
-use crate::command::{self, DenoArgs};
+use crate::command::{self, DenoArgs, ROBOTO_FONT_FILE};
 
 pub struct PdfTools;
 
@@ -134,15 +134,20 @@ impl PdfTools {
     }
 
     pub fn add_pages(in_path: &Path, out_path: &Path) -> eyre::Result<PathBuf> {
+        let font_path = ROBOTO_FONT_FILE.to_str().unwrap();
+        let font = format!("Roboto={font_path}");
+
         let args: Vec<&dyn AsRef<std::ffi::OsStr>> = vec![
             &"-add-text",
-            &"%Page",
+            &"ст. %Page",
             &"-bottomright",
             &"5 5",
+            &"-load-ttf",
+            &font,
+            &"-font",
+            &"Roboto",
             &"-font-size",
             &"11",
-            &"-font",
-            &"Helvetica",
             &in_path,
             &"-o",
             &out_path,
