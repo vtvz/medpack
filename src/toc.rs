@@ -49,7 +49,7 @@ impl<'a> Toc<'a> {
                     "#,
                     index = index + 1,
                     date = item.record.date,
-                    tags = item.record.tags.join("</li><li>"),
+                    tags = item.record.tags.join("</li><li>").to_lowercase(),
                     place = item
                         .record
                         .place

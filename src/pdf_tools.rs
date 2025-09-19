@@ -133,6 +133,26 @@ impl PdfTools {
         Ok(output_path)
     }
 
+    pub fn add_pages(in_path: &Path, out_path: &Path) -> eyre::Result<PathBuf> {
+        let args: Vec<&dyn AsRef<std::ffi::OsStr>> = vec![
+            &"-add-text",
+            &"%Page",
+            &"-bottomright",
+            &"5 5",
+            &"-font-size",
+            &"11",
+            &"-font",
+            &"Helvetica",
+            &in_path,
+            &"-o",
+            &out_path,
+        ];
+
+        command::cpdf(args)?;
+
+        Ok(out_path.to_path_buf())
+    }
+
     pub fn label(
         in_path: &Path,
         out_path: &Path,

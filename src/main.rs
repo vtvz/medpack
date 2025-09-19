@@ -210,12 +210,11 @@ fn process_record<'a>(
     for (i, msg) in rec.messages.iter().enumerate() {
         let pdf = process_message(app, msg)?;
 
-        let label = format!(
-            "{}...: {}",
-            rec.tags.join(", ").chars().take(55).collect::<String>(),
-            &rec.date
-        );
-        // label_pdf(label)?;
+        let mut tags = rec.tags.join(", ").to_lowercase();
+        if tags.chars().count() > 58 {
+            tags = format!("{}...", tags.chars().take(55).collect::<String>());
+        }
+        let label = format!("{}: {}", tags, &rec.date);
 
         let paging = if msg.is_photo() {
             format!("стр {} из {}", i + 1, rec.messages.len())
@@ -268,7 +267,6 @@ fn process_person(app: &App, name: &str, recs: &[Record]) -> eyre::Result<()> {
 
     let results = recs
         .par_iter()
-        // .iter()
         .enumerate()
         .map(|(i, rec)| {
             println!("{} - {} of {}", name, i + 1, recs.len());
@@ -291,13 +289,17 @@ fn process_person(app: &App, name: &str, recs: &[Record]) -> eyre::Result<()> {
     println!("{name} - Unite {} pdf files", pdfs.len());
 
     // Output file as last parameter
-    let result_pdf = format!("{name}.pdf");
+    let united_pdf = app.tmp_label(format!("{name}.pdf"));
 
-    pdfs.push(result_pdf.clone().into());
+    pdfs.push(united_pdf.clone());
 
     pdfunite(pdfs)?;
 
-    println!("{name} - result file {result_pdf}\n");
+    let result_pds = format!("{name}.pdf");
+
+    PdfTools::add_pages(&united_pdf, result_pds.as_ref())?;
+
+    println!("{name} - result file {result_pds}\n");
 
     Ok(())
 }

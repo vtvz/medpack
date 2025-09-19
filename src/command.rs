@@ -4,7 +4,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use eyre::{eyre, Ok};
+use eyre::{Ok, eyre};
 use lazy_static::lazy_static;
 use tempdir::TempDir;
 
@@ -34,6 +34,10 @@ pub fn pdfunite(
     pdfs: impl IntoIterator<Item = impl AsRef<OsStr>> + std::fmt::Debug,
 ) -> eyre::Result<String> {
     cmd("pdfunite", pdfs)
+}
+
+pub fn cpdf(params: impl IntoIterator<Item = impl AsRef<OsStr>>) -> eyre::Result<String> {
+    cmd("cpdf", params)
 }
 
 pub fn wkhtmltopdf(
