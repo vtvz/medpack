@@ -43,6 +43,10 @@ pub fn cpdf(params: impl IntoIterator<Item = impl AsRef<OsStr>>) -> eyre::Result
     cmd("cpdf", params)
 }
 
+pub fn ocrmypdf(params: impl IntoIterator<Item = impl AsRef<OsStr>>) -> eyre::Result<String> {
+    cmd("ocrmypdf", params)
+}
+
 pub fn wkhtmltopdf(
     args: &[impl AsRef<OsStr> + std::fmt::Debug],
     input: impl AsRef<OsStr>,

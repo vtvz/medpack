@@ -28,6 +28,11 @@ impl PdfTools {
         .small-font {
             font-size: 0.8em;
         }
+
+        .message-id {
+            font-size: 0.5em;
+            color: #c6c6c6;
+        }
         "#;
 
         let content = format!(

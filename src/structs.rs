@@ -96,7 +96,9 @@ impl Message {
     }
 
     pub fn is_photo(&self) -> bool {
-        self.photo.is_some() || self.mime_type == Some("image/jpeg".into())
+        self.photo.is_some()
+            || self.mime_type == Some("image/jpeg".into())
+            || self.mime_type == Some("image/png".into())
     }
 
     pub fn unwrap_export_path(&self) -> PathBuf {
@@ -109,7 +111,9 @@ impl Message {
             export_path.push(photo);
 
             export_path
-        } else if self.mime_type == Some("image/jpeg".into()) {
+        } else if self.mime_type == Some("image/jpeg".into())
+            || self.mime_type == Some("image/png".into())
+        {
             self.unwrap_file()
         } else {
             panic!("File should exist")

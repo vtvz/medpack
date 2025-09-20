@@ -38,7 +38,7 @@ impl<'a> Toc<'a> {
                     r#"
                         <tr>
                             <td>{index}</td>
-                            <td>{date}</td>
+                            <td>{date}<div class="message-id">{id}</div></td>
                             <td style="width: 100%">
                                 {place}
                                 <ul><li>{tags}</li></ul>
@@ -48,8 +48,14 @@ impl<'a> Toc<'a> {
                         </tr>
                     "#,
                     index = index + 1,
+                    id = item
+                        .record
+                        .messages
+                        .first()
+                        .map(|message| message.id)
+                        .unwrap_or_default(),
                     date = item.record.date,
-                    tags = item.record.tags.join("</li><li>").to_lowercase(),
+                    tags = item.record.tags.join("</li><li>"),
                     place = item
                         .record
                         .place

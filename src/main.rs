@@ -13,7 +13,6 @@ use rayon::iter::{
 use structs::{Export, Message, Record};
 
 use crate::app::App;
-use crate::command::{img2pdf, pdfunite};
 use crate::pdf_tools::PdfTools;
 use crate::toc::{Toc, TocItem};
 
@@ -174,19 +173,31 @@ fn process_message(app: &App, msg: &Message) -> eyre::Result<PathBuf> {
     let path = if msg.is_pdf() {
         msg.unwrap_file()
     } else if msg.is_photo() {
-        let path = app.tmp_img(format!("{}.pdf", msg.id));
+        let path_img = app.tmp_img(format!("{}-img.pdf", msg.id));
 
-        img2pdf([
+        command::img2pdf([
             "--imgsize",
             "595x5000",
             "--fit",
             "into",
             &msg.unwrap_photo().to_string_lossy(),
             "-o",
-            &path.to_string_lossy(),
+            &path_img.to_string_lossy(),
         ])?;
 
-        path
+        // path_img
+
+        // INFO: Do I need it?
+        let path_res = app.tmp_img(format!("{}-ocr.pdf", msg.id));
+
+        command::ocrmypdf([
+            "-l",
+            "rus+eng",
+            &path_img.to_string_lossy(),
+            &path_res.to_string_lossy(),
+        ])?;
+
+        path_res
     } else {
         let content = msg.text_entities[1..]
             .iter()
@@ -210,7 +221,7 @@ fn process_record<'a>(
     for (i, msg) in rec.messages.iter().enumerate() {
         let pdf = process_message(app, msg)?;
 
-        let mut tags = rec.tags.join(", ").to_lowercase();
+        let mut tags = rec.tags.join(", ");
         if tags.chars().count() > 58 {
             tags = format!("{}...", tags.chars().take(55).collect::<String>());
         }
@@ -293,7 +304,7 @@ fn process_person(app: &App, name: &str, recs: &[Record]) -> eyre::Result<()> {
 
     pdfs.push(united_pdf.clone());
 
-    pdfunite(pdfs)?;
+    command::pdfunite(pdfs)?;
 
     let result_pds = format!("{name}.pdf");
 
