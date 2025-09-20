@@ -8,16 +8,18 @@ pub struct TocItem<'a> {
 }
 
 pub struct Toc<'a> {
+    pub chat_id: i64,
     pub items: Vec<TocItem<'a>>,
 }
 
 impl<'a> Toc<'a> {
-    pub fn new() -> Self {
-        Self::new_from(Vec::new())
+    pub fn new(chat_id: i64) -> Self {
+        Self::new_from(chat_id, Vec::new())
     }
 
-    pub fn new_from(toc_items: impl IntoIterator<Item = TocItem<'a>>) -> Self {
+    pub fn new_from(chat_id: i64, toc_items: impl IntoIterator<Item = TocItem<'a>>) -> Self {
         Self {
+            chat_id,
             items: toc_items.into_iter().collect(),
         }
     }
@@ -38,7 +40,7 @@ impl<'a> Toc<'a> {
                     r#"
                         <tr>
                             <td>{index}</td>
-                            <td>{date}<div class="message-id">{id}</div></td>
+                            <td>{date}<div class="message-id"><a href="https://t.me/c/{chat_id}/{id}">{id}</div></td>
                             <td style="width: 100%">
                                 {place}
                                 <ul><li>{tags}</li></ul>
@@ -48,6 +50,7 @@ impl<'a> Toc<'a> {
                         </tr>
                     "#,
                     index = index + 1,
+                    chat_id = self.chat_id,
                     id = item
                         .record
                         .messages

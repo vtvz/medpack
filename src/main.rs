@@ -128,6 +128,8 @@ fn app() -> eyre::Result<()> {
         .map(|path| get_export_result(path))
         .collect::<Result<Vec<_>, _>>()?;
 
+    let chat_id = exports.first().map(|export| export.id).unwrap_or_default();
+
     let messages = exports
         .into_iter()
         .flat_map(|export| export.messages)
@@ -161,7 +163,7 @@ fn app() -> eyre::Result<()> {
     let result: Result<Vec<_>, _> = collection
         .into_par_iter()
         // .take_any(1)
-        .map(|(name, recs)| process_person(&app, &name, &recs))
+        .map(|(name, recs)| process_person(&app, &name, chat_id, &recs))
         .collect();
 
     result?;
@@ -273,7 +275,7 @@ fn generate_toc_file(app: &App, person_name: &str, toc: Toc) -> eyre::Result<Pat
     Ok(output_path)
 }
 
-fn process_person(app: &App, name: &str, recs: &[Record]) -> eyre::Result<()> {
+fn process_person(app: &App, name: &str, chat_id: i64, recs: &[Record]) -> eyre::Result<()> {
     println!("## Process person {name}");
 
     let results = recs
@@ -290,7 +292,7 @@ fn process_person(app: &App, name: &str, recs: &[Record]) -> eyre::Result<()> {
 
     let mut pdfs = pdfs.into_iter().flatten().collect_vec();
 
-    let mut toc = Toc::new();
+    let mut toc = Toc::new(chat_id);
     toc_items.into_iter().for_each(|item| toc.append(item));
 
     let toc_path = generate_toc_file(app, name, toc)?;
