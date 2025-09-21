@@ -31,6 +31,9 @@ impl PdfTools {
 
         .message-id {
             font-size: 0.5em;
+        }
+
+        .message-id a {
             color: #c6c6c6;
         }
         "#;
@@ -169,6 +172,7 @@ impl PdfTools {
         left_text: &str,
         right_text: &str,
         bottom_text: &str,
+        bottom_link: &str,
     ) -> eyre::Result<PathBuf> {
         // let text_color = "black";
         // let outline_color = "white";
@@ -182,6 +186,7 @@ impl PdfTools {
             left_text,
             right_text,
             bottom_text,
+            bottom_link,
         })?;
 
         Ok(out_path.to_path_buf())

@@ -1,6 +1,13 @@
 // @deno-types="npm:@types/node"
 import { readFileSync, writeFileSync } from "node:fs";
-import { PDFDocument, PDFFont, PDFPage, rgb } from "npm:pdf-lib@1.17.1";
+import {
+  PDFDocument,
+  PDFName,
+  PDFFont,
+  PDFString,
+  PDFPage,
+  rgb,
+} from "npm:pdf-lib@1.17.1";
 import fontkit from "npm:@pdf-lib/fontkit@1.1.1";
 import arg from "npm:arg";
 import process from "node:process";
@@ -11,6 +18,7 @@ class Config {
   rightLext: string = "";
   leftLext: string = "";
   bottomText: string = "";
+  bottomLink: string = "";
   fontPath: string = "";
 
   static fromArgs(argv: string[]): Config {
@@ -22,6 +30,7 @@ class Config {
         "-r": String,
         "-l": String,
         "-b": String,
+        "-u": String,
         "-f": String,
       },
       { argv },
@@ -32,6 +41,7 @@ class Config {
     config.rightLext = args["-r"] as string;
     config.leftLext = args["-l"] as string;
     config.bottomText = args["-b"] as string;
+    config.bottomLink = args["-u"] as string;
     config.fontPath = args["-f"] as string;
 
     return config;
@@ -84,7 +94,13 @@ class App {
           .replace("%EndPage", `${pages.length}`),
       );
       this.addRightText(page, font, this.config.rightLext);
-      this.addCentreBottom(page, font, this.config.bottomText);
+      this.addCentreBottom(
+        pdfDoc,
+        page,
+        font,
+        this.config.bottomText,
+        this.config.bottomLink,
+      );
     });
 
     const pdfBytes = await pdfDoc.save();
@@ -122,15 +138,23 @@ class App {
     });
   }
 
-  addCentreBottom(page: PDFPage, font: PDFFont, text: string) {
+  addCentreBottom(
+    pdfDoc: PDFDocument,
+    page: PDFPage,
+    font: PDFFont,
+    text: string,
+    url: string,
+  ) {
     const FONT_SIZE = 5;
     const { width } = page.getSize();
 
     const textWidth = font.widthOfTextAtSize(text, FONT_SIZE);
+    const textHeight = font.heightAtSize(FONT_SIZE);
 
     const x = (width - textWidth) / 2 - this.textMarginHorizontal;
     const y = 5;
 
+    // Draw the link text with blue color and underline to indicate it's a link
     page.drawText(text, {
       x: x,
       y: y,
@@ -138,6 +162,25 @@ class App {
       font: font,
       color: rgb(0.5, 0.5, 0.5),
     });
+
+    const linkAnnotation = pdfDoc.context.obj({
+      Type: "Annot",
+      Subtype: "Link",
+      Rect: [x, y, x + textWidth, y + textHeight],
+      Border: [0, 0, 0],
+      C: [0, 0, 0],
+      A: {
+        Type: "Action",
+        S: "URI",
+        URI: PDFString.of(url),
+      },
+    });
+    const linkAnnotationRef = pdfDoc.context.register(linkAnnotation);
+
+    page.node.set(
+      PDFName.of("Annots"),
+      pdfDoc.context.obj([linkAnnotationRef]),
+    );
   }
 
   extendPdfPages(page: PDFPage) {

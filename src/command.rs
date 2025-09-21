@@ -90,6 +90,7 @@ pub struct DenoArgs<'a> {
     pub left_text: &'a str,
     pub right_text: &'a str,
     pub bottom_text: &'a str,
+    pub bottom_link: &'a str,
 }
 
 pub fn deno(args: DenoArgs) -> eyre::Result<String> {
@@ -111,6 +112,8 @@ pub fn deno(args: DenoArgs) -> eyre::Result<String> {
         args.right_text,
         "-b",
         args.bottom_text,
+        "-u",
+        args.bottom_link,
         "-f",
         font_path,
     ];

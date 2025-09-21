@@ -176,6 +176,7 @@ fn process_message(app: &App, msg: &Message) -> eyre::Result<PathBuf> {
         msg.unwrap_file()
     } else if msg.is_photo() {
         let path_img = app.tmp_img(format!("{}-img.pdf", msg.id));
+        let to_ocr = true;
 
         command::img2pdf([
             "--imgsize",
@@ -187,19 +188,20 @@ fn process_message(app: &App, msg: &Message) -> eyre::Result<PathBuf> {
             &path_img.to_string_lossy(),
         ])?;
 
-        // path_img
+        if !to_ocr {
+            path_img
+        } else {
+            let path_res = app.tmp_img(format!("{}-ocr.pdf", msg.id));
 
-        // INFO: Do I need it?
-        let path_res = app.tmp_img(format!("{}-ocr.pdf", msg.id));
+            command::ocrmypdf([
+                "-l",
+                "rus+eng",
+                &path_img.to_string_lossy(),
+                &path_res.to_string_lossy(),
+            ])?;
 
-        command::ocrmypdf([
-            "-l",
-            "rus+eng",
-            &path_img.to_string_lossy(),
-            &path_res.to_string_lossy(),
-        ])?;
-
-        path_res
+            path_res
+        }
     } else {
         let content = msg.text_entities[1..]
             .iter()
@@ -214,6 +216,7 @@ fn process_message(app: &App, msg: &Message) -> eyre::Result<PathBuf> {
 
 fn process_record<'a>(
     app: &App,
+    chat_id: i64,
     rec: &'a Record,
 ) -> eyre::Result<(Vec<PathBuf>, Vec<TocItem<'a>>)> {
     let mut pdfs = vec![];
@@ -236,8 +239,14 @@ fn process_record<'a>(
         };
 
         let labeled_pdf = app.tmp_label(format!("{}.pdf", msg.id));
-        let labeled_pdf =
-            PdfTools::label(&pdf, &labeled_pdf, &paging, &label, &msg.id.to_string())?;
+        let labeled_pdf = PdfTools::label(
+            &pdf,
+            &labeled_pdf,
+            &paging,
+            &label,
+            &msg.id.to_string(),
+            &format!("https://t.me/c/{chat_id}/{id}", id = msg.id),
+        )?;
 
         pages += PdfTools::get_pages_count(&pdf)?;
         println!(
@@ -284,7 +293,7 @@ fn process_person(app: &App, name: &str, chat_id: i64, recs: &[Record]) -> eyre:
         .map(|(i, rec)| {
             println!("{} - {} of {}", name, i + 1, recs.len());
 
-            process_record(app, rec)
+            process_record(app, chat_id, rec)
         })
         .collect::<Result<Vec<_>, _>>()?;
 
