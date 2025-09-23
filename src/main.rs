@@ -186,9 +186,9 @@ fn app(args: Cli) -> eyre::Result<()> {
 
     let m = MultiProgress::new();
     let sty = ProgressStyle::with_template(
-        &"{spinner:.green} {prefix:<{prefix_width}.red} : {msg}\n[{elapsed_precise}] {wide_bar:.cyan/blue} {pos:>{progress_width}}/{len:{progress_width}}"
-            .replace("{prefix_width}", &prefix_width.to_string())
-            .replace("{progress_width}", &messages_len.to_string().chars().count().to_string()),
+        &"{spinner:.green} {prefix:<[prefix_width].red} : {msg}\n[{elapsed_precise}] {wide_bar:.cyan/blue} {pos:>[progress_width]}/{len:[progress_width]}"
+            .replace("[prefix_width]", &prefix_width.to_string())
+            .replace("[progress_width]", &messages_len.to_string().chars().count().to_string()),
     )?;
 
     let pb_total = m
