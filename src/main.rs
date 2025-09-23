@@ -1,16 +1,14 @@
 #![feature(exit_status_error)]
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use clap::Parser;
 use eyre::Ok;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use itertools::Itertools;
-use rayon::iter::{
-    IndexedParallelIterator,
-    IntoParallelIterator,
-    IntoParallelRefIterator,
-    ParallelIterator,
-};
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 use crate::app::App;
 use crate::pdf_tools::PdfTools;
@@ -126,13 +124,22 @@ fn main() -> eyre::Result<()> {
 
     let Err(err) = res else { return Ok(()) };
 
-    println!("{err:?}");
+    eprintln!("{err:?}");
 
     Err(err)
 }
 
 fn app(args: Cli) -> eyre::Result<()> {
     let app = App::new(args.clone())?;
+
+    if args.preserve_tmp {
+        println!(
+            "tmp folders: {tmp_html} {tmp_img} {tmp_label}",
+            tmp_html = app.tmp_html("").to_string_lossy(),
+            tmp_label = app.tmp_label("").to_string_lossy(),
+            tmp_img = app.tmp_img("").to_string_lossy(),
+        );
+    }
 
     let exports = args
         .sources
@@ -157,7 +164,7 @@ fn app(args: Cli) -> eyre::Result<()> {
         .map(|msg| (msg.reply_to_message_id, msg))
         .into_group_map();
 
-    let collection = grouped_by_topic
+    let person_records = grouped_by_topic
         .into_values()
         .flat_map(group_messages)
         .sorted_by_key(|rec| rec.date.clone())
@@ -165,25 +172,61 @@ fn app(args: Cli) -> eyre::Result<()> {
         .map(|rec| (rec.person.clone(), rec))
         .into_group_map();
 
-    println!(
-        "{tmp_html} {tmp_img} {tmp_label}",
-        tmp_html = app.tmp_html("").to_string_lossy(),
-        tmp_label = app.tmp_label("").to_string_lossy(),
-        tmp_img = app.tmp_img("").to_string_lossy(),
-    );
+    let messages_len: usize = person_records
+        .values()
+        .flat_map(|records| records.iter())
+        .map(|record| record.messages.len())
+        .sum();
 
-    let result: Result<Vec<_>, _> = collection
+    let prefix_width = person_records
+        .keys()
+        .map(|name| name.chars().count())
+        .max()
+        .unwrap_or(10);
+
+    let m = MultiProgress::new();
+    let sty = ProgressStyle::with_template(
+        &"{spinner:.green} {prefix:<{prefix_width}.red} : {msg}\n[{elapsed_precise}] {wide_bar:.cyan/blue} {pos:>{progress_width}}/{len:{progress_width}}"
+            .replace("{prefix_width}", &prefix_width.to_string())
+            .replace("{progress_width}", &messages_len.to_string().chars().count().to_string()),
+    )?;
+
+    let pb_total = m
+        .add(ProgressBar::new(messages_len as _))
+        .with_style(sty.clone())
+        .with_prefix("total")
+        .with_message("total progress of all messages");
+
+    pb_total.enable_steady_tick(Duration::from_millis(100));
+
+    let person_records_pbs: HashMap<_, (Vec<Record>, ProgressBar)> = person_records
+        .into_iter()
+        .map(|(person, records)| {
+            let messages_len: usize = records.iter().map(|rec| rec.messages.len()).sum();
+            let pb = m.add(ProgressBar::new(messages_len as _));
+            pb.enable_steady_tick(Duration::from_millis(100));
+            pb.set_style(sty.clone());
+            pb.set_message("Starting");
+            pb.set_prefix(person.clone());
+
+            (person, (records, pb))
+        })
+        .collect();
+
+    let result: Result<Vec<_>, _> = person_records_pbs
         .into_par_iter()
         // .take_any(1)
-        .map(|(name, recs)| process_person(&app, &name, chat_id, &recs))
+        .map(|(name, (recs, pb))| process_person(&app, &name, chat_id, &recs, &pb, &pb_total))
         .collect();
+
+    pb_total.finish_with_message("everything is done");
 
     result?;
 
     Ok(())
 }
 
-fn process_message(app: &App, msg: &Message) -> eyre::Result<PathBuf> {
+fn process_message(app: &App, msg: &Message, pb: &ProgressBar) -> eyre::Result<PathBuf> {
     let path = if msg.is_pdf() {
         msg.unwrap_file()
     } else if msg.is_photo() {
@@ -202,6 +245,7 @@ fn process_message(app: &App, msg: &Message) -> eyre::Result<PathBuf> {
         if !app.process_ocr {
             path_img
         } else {
+            pb.set_message(format!("process ocr for {}", msg.id));
             let path_res = app.tmp_img(format!("{}-ocr.pdf", msg.id));
 
             command::ocrmypdf([
@@ -211,6 +255,8 @@ fn process_message(app: &App, msg: &Message) -> eyre::Result<PathBuf> {
                 &path_res.to_string_lossy(),
             ])?;
 
+            pb.set_message(format!("process ocr complete {}", msg.id));
+
             path_res
         }
     } else {
@@ -219,7 +265,7 @@ fn process_message(app: &App, msg: &Message) -> eyre::Result<PathBuf> {
             .map(|entity| entity.to_html())
             .join("");
 
-        PdfTools::from_html(app, msg.id, &content)?
+        PdfTools::from_html(app, msg.id, &content, pb)?
     };
 
     Ok(path)
@@ -229,13 +275,17 @@ fn process_record<'a>(
     app: &App,
     chat_id: i64,
     rec: &'a Record,
+    pb: &ProgressBar,
+    pb_total: &ProgressBar,
 ) -> eyre::Result<(Vec<PathBuf>, Vec<TocItem<'a>>)> {
     let mut pdfs = vec![];
     let mut toc_items = vec![];
     let mut pages = 0;
 
     for (i, msg) in rec.messages.iter().enumerate() {
-        let pdf = process_message(app, msg)?;
+        pb.set_message(format!("process {} message", msg.id));
+
+        let pdf = process_message(app, msg, pb)?;
 
         let mut tags = rec.tags.join(", ");
         if tags.chars().count() > 58 {
@@ -260,12 +310,13 @@ fn process_record<'a>(
         )?;
 
         pages += PdfTools::get_pages_count(&pdf)?;
-        println!(
-            "  - {labeled_pdf}",
-            labeled_pdf = labeled_pdf.to_string_lossy()
-        );
 
         pdfs.push(labeled_pdf);
+
+        pb.inc(1);
+        pb_total.inc(1);
+
+        pb.set_message(format!("complete {} message", msg.id));
     }
 
     toc_items.push(TocItem { record: rec, pages });
@@ -273,7 +324,12 @@ fn process_record<'a>(
     Ok((pdfs, toc_items))
 }
 
-fn generate_toc_file(app: &App, person_name: &str, toc: Toc) -> eyre::Result<PathBuf> {
+fn generate_toc_file(
+    app: &App,
+    person_name: &str,
+    toc: Toc,
+    pb: &ProgressBar,
+) -> eyre::Result<PathBuf> {
     let mut shift = 1;
 
     let mut output_path = "".into();
@@ -283,6 +339,7 @@ fn generate_toc_file(app: &App, person_name: &str, toc: Toc) -> eyre::Result<Pat
             app,
             "toc-".to_string() + person_name,
             &toc.generate_html(shift),
+            pb,
         )?;
 
         shift = PdfTools::get_pages_count(&output_path)?;
@@ -295,16 +352,24 @@ fn generate_toc_file(app: &App, person_name: &str, toc: Toc) -> eyre::Result<Pat
     Ok(output_path)
 }
 
-fn process_person(app: &App, name: &str, chat_id: i64, recs: &[Record]) -> eyre::Result<()> {
-    println!("## Process person {name}");
-
+fn process_person(
+    app: &App,
+    name: &str,
+    chat_id: i64,
+    recs: &[Record],
+    pb: &ProgressBar,
+    pb_total: &ProgressBar,
+) -> eyre::Result<()> {
     let results = recs
         .par_iter()
-        .enumerate()
-        .map(|(i, rec)| {
-            println!("{} - {} of {}", name, i + 1, recs.len());
+        .map(|rec| {
+            pb.set_message(format!("process {} rec", rec.date));
 
-            process_record(app, chat_id, rec)
+            let res = process_record(app, chat_id, rec, pb, pb_total);
+
+            pb.set_message(format!("complete {} rec", rec.date));
+
+            res
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -315,11 +380,11 @@ fn process_person(app: &App, name: &str, chat_id: i64, recs: &[Record]) -> eyre:
     let mut toc = Toc::new(chat_id);
     toc_items.into_iter().for_each(|item| toc.append(item));
 
-    let toc_path = generate_toc_file(app, name, toc)?;
+    let toc_path = generate_toc_file(app, name, toc, &pb)?;
 
     pdfs.insert(0, toc_path);
 
-    println!("{name} - Unite {} pdf files", pdfs.len());
+    pb.set_message(format!("unite {} pdf files", pdfs.len()));
 
     // Output file as last parameter
     let united_pdf = app.tmp_label(format!("{name}.pdf"));
@@ -330,9 +395,9 @@ fn process_person(app: &App, name: &str, chat_id: i64, recs: &[Record]) -> eyre:
 
     let result_pds = format!("{name}.pdf");
 
-    PdfTools::add_pages(&united_pdf, result_pds.as_ref())?;
+    PdfTools::add_page_numbers(&united_pdf, result_pds.as_ref())?;
 
-    println!("{name} - result file {result_pds}\n");
+    pb.finish_with_message(format!("finished - result file {result_pds}"));
 
     Ok(())
 }

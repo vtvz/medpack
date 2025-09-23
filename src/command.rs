@@ -17,8 +17,8 @@ pub fn cmd(cmd: &str, args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> eyre
     if res.status.success() {
         Ok(String::from_utf8(res.stdout)?)
     } else {
-        println!("{}", String::from_utf8(res.stdout)?);
-        println!("{}", String::from_utf8(res.stderr)?);
+        eprintln!("{}", String::from_utf8(res.stdout)?);
+        eprintln!("{}", String::from_utf8(res.stderr)?);
         Err(eyre!("Exited with exit code {}", res.status))
     }
 }

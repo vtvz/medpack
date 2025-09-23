@@ -3,6 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use eyre::Ok;
+use indicatif::ProgressBar;
 use regex::Regex;
 
 use crate::app::App;
@@ -11,7 +12,12 @@ use crate::command::{self, DenoArgs, ROBOTO_FONT_FILE};
 pub struct PdfTools;
 
 impl PdfTools {
-    pub fn from_html(app: &App, slug: impl Display, content: &str) -> eyre::Result<PathBuf> {
+    pub fn from_html(
+        app: &App,
+        slug: impl Display,
+        content: &str,
+        pb: &ProgressBar,
+    ) -> eyre::Result<PathBuf> {
         let bootstrap = include_str!("assets/bootstrap-v4.6.2.min.css");
 
         let css_style = r#"
@@ -105,10 +111,9 @@ impl PdfTools {
 
             pages = Self::get_pages_count(&output_path)? as _;
 
-            println!(
-                "{} shrink. Size {new_page_height}mm. Pages {pages}",
-                output_path.to_string_lossy(),
-            );
+            pb.set_message(format!(
+                "{slug} shrink. Size {new_page_height}mm. Pages {pages}",
+            ));
 
             if pages == 1 {
                 new_page_height -= page_chunk_height;
@@ -127,21 +132,19 @@ impl PdfTools {
 
             pages = Self::get_pages_count(&output_path)? as _;
 
-            println!(
-                "{} expand. Size {new_page_height}mm. Pages {pages}",
-                output_path.to_string_lossy()
-            );
+            pb.set_message(format!(
+                "{slug} expand. Size {new_page_height}mm. Pages {pages}",
+            ));
         }
 
-        println!(
-            "{} ready. Size {new_page_height}mm. Pages {pages}",
-            output_path.to_string_lossy()
-        );
+        pb.set_message(format!(
+            "{slug} ready. Size {new_page_height}mm. Pages {pages}",
+        ));
 
         Ok(output_path)
     }
 
-    pub fn add_pages(in_path: &Path, out_path: &Path) -> eyre::Result<PathBuf> {
+    pub fn add_page_numbers(in_path: &Path, out_path: &Path) -> eyre::Result<PathBuf> {
         let font_path = ROBOTO_FONT_FILE.to_str().unwrap();
         let font = format!("Roboto={font_path}");
 
