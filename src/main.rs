@@ -2,6 +2,7 @@
 use std::fs;
 use std::path::PathBuf;
 
+use clap::Parser;
 use eyre::Ok;
 use itertools::Itertools;
 use rayon::iter::{
@@ -10,10 +11,10 @@ use rayon::iter::{
     IntoParallelRefIterator,
     ParallelIterator,
 };
-use structs::{Export, Message, Record};
 
 use crate::app::App;
 use crate::pdf_tools::PdfTools;
+use crate::structs::{Export, Message, Record};
 use crate::toc::{Toc, TocItem};
 
 mod app;
@@ -21,6 +22,23 @@ mod command;
 mod pdf_tools;
 mod structs;
 mod toc;
+
+/// Simple program to greet a person
+#[derive(Parser, Debug, Clone)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    /// Preserve tmp directories
+    #[arg(short, long)]
+    preserve_tmp: bool,
+
+    /// Skip images processing with ocr
+    #[arg(short, long)]
+    no_ocr: bool,
+
+    /// Source locations
+    #[arg(default_values_t = vec![".".to_string()])]
+    sources: Vec<String>,
+}
 
 fn group_to_record(group: Vec<Message>) -> Record {
     let mut record = group
@@ -102,7 +120,9 @@ fn get_export_result(export_path: &str) -> eyre::Result<Export> {
 }
 
 fn main() -> eyre::Result<()> {
-    let res = app();
+    let cli_args = Cli::parse();
+
+    let res = app(cli_args);
 
     let Err(err) = res else { return Ok(()) };
 
@@ -111,19 +131,11 @@ fn main() -> eyre::Result<()> {
     Err(err)
 }
 
-fn app() -> eyre::Result<()> {
-    let args: Vec<_> = std::env::args().skip(1).collect();
+fn app(args: Cli) -> eyre::Result<()> {
+    let app = App::new(args.clone())?;
 
-    // let export_path = args.get(1).cloned().unwrap_or(".".into());
-    let export_paths = if args.is_empty() {
-        vec![".".to_string()]
-    } else {
-        args
-    };
-
-    let app = App::new()?;
-
-    let exports = export_paths
+    let exports = args
+        .sources
         .iter()
         .map(|path| get_export_result(path))
         .collect::<Result<Vec<_>, _>>()?;
@@ -176,7 +188,6 @@ fn process_message(app: &App, msg: &Message) -> eyre::Result<PathBuf> {
         msg.unwrap_file()
     } else if msg.is_photo() {
         let path_img = app.tmp_img(format!("{}-img.pdf", msg.id));
-        let to_ocr = true;
 
         command::img2pdf([
             "--imgsize",
@@ -188,7 +199,7 @@ fn process_message(app: &App, msg: &Message) -> eyre::Result<PathBuf> {
             &path_img.to_string_lossy(),
         ])?;
 
-        if !to_ocr {
+        if !app.process_ocr {
             path_img
         } else {
             let path_res = app.tmp_img(format!("{}-ocr.pdf", msg.id));

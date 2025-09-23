@@ -2,18 +2,20 @@ use std::path::{Path, PathBuf};
 
 use tempdir::TempDir;
 
+use crate::Cli;
+
 type Temp = Box<dyn AsRef<Path> + Sync + Send>;
 
 pub struct App {
     tmp_img: Temp,
     tmp_html: Temp,
     tmp_label: Temp,
+    pub process_ocr: bool,
 }
 
 impl App {
-    fn generate_tmp(name: &str) -> eyre::Result<Temp> {
+    fn generate_tmp(name: &str, preserve: bool) -> eyre::Result<Temp> {
         let name = format!("tmp_medpack_{name}");
-        let preserve = std::env::var("PRESERVE_TMP").is_ok();
 
         let tmp: Temp = if preserve {
             Box::new(TempDir::new(&name)?.into_path())
@@ -24,11 +26,12 @@ impl App {
         Ok(tmp)
     }
 
-    pub fn new() -> eyre::Result<Self> {
+    pub fn new(cli: Cli) -> eyre::Result<Self> {
         Ok(Self {
-            tmp_img: Self::generate_tmp("img")?,
-            tmp_html: Self::generate_tmp("html")?,
-            tmp_label: Self::generate_tmp("label")?,
+            tmp_img: Self::generate_tmp("img", cli.preserve_tmp)?,
+            tmp_html: Self::generate_tmp("html", cli.preserve_tmp)?,
+            tmp_label: Self::generate_tmp("label", cli.preserve_tmp)?,
+            process_ocr: !cli.no_ocr,
         })
     }
 
