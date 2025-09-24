@@ -128,11 +128,14 @@ telegram_export/
 Messages can contain YAML blocks with medical record metadata:
 
 ```yaml
-date: "2023.12.22"
-person: "John Doe"
-tags: ["cardiology", "checkup", "ECG"]
-place: "City Hospital"
-doctor: "Dr. Smith"
+date: 2023.12.22
+person: John Doe
+tags:
+- cardiology
+- checkup
+- ECG
+place: City Hospital
+doctor: Dr. Smith
 ```
 
 For messages without images or PDF files, any text following the YAML block will be used as the medical document data.
