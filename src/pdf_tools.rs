@@ -89,7 +89,7 @@ impl PdfTools {
 
         let page_margin = 10;
 
-        if std::env::var("UNADAPTIVE_TEXT_PAGES").is_ok() {
+        if app.unadaptive_text_pages {
             generate_file(297, page_margin)?;
 
             return Ok(output_path);

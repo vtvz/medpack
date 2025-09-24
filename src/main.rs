@@ -28,12 +28,16 @@ mod toc;
 #[command(version, about, long_about = None)]
 struct Cli {
     /// Preserve tmp directories
-    #[arg(short, long)]
+    #[arg(long)]
     preserve_tmp: bool,
 
     /// Skip images processing with ocr
-    #[arg(short, long)]
+    #[arg(long)]
     no_ocr: bool,
+
+    /// Do not shrink or extend text pages (including toc)
+    #[arg(long)]
+    unadaptive_text_pages: bool,
 
     /// Source locations
     #[arg(default_values_t = vec![".".to_string()])]
@@ -358,6 +362,8 @@ fn generate_toc_file(
 
     let mut output_path = "".into();
 
+    // NOTE: Two iterations are required to properly calculate pages shift
+    // as toc can be multipaged
     for _ in ["first", "second"] {
         output_path = PdfTools::from_html(
             app,

@@ -11,6 +11,7 @@ pub struct App {
     tmp_html: Temp,
     tmp_label: Temp,
     pub process_ocr: bool,
+    pub unadaptive_text_pages: bool,
 }
 
 impl App {
@@ -32,6 +33,7 @@ impl App {
             tmp_html: Self::generate_tmp("html", cli.preserve_tmp)?,
             tmp_label: Self::generate_tmp("label", cli.preserve_tmp)?,
             process_ocr: !cli.no_ocr,
+            unadaptive_text_pages: cli.unadaptive_text_pages,
         })
     }
 
