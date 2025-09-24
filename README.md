@@ -213,7 +213,7 @@ tmp folders: /tmp/medpack_html_xyz /tmp/medpack_img_xyz /tmp/medpack_label_xyz
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
 ---
 
