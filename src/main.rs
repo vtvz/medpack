@@ -203,29 +203,41 @@ fn app(args: Cli) -> eyre::Result<()> {
 
     let m = MultiProgress::new();
 
-    let sty = ProgressStyle::with_template(
-        &"{spinner:.green} {prefix:<[prefix_width].red} : {msg}\n[{elapsed_precise}] {wide_bar:.cyan/blue} {pos:>[progress_width]}/{len:[progress_width]}"
+    let pb_total_style = ProgressStyle::with_template(
+        &"{spinner:.green} [emoji]{prefix:<[prefix_width].red} : {msg}\n[{elapsed_precise}] {wide_bar:.cyan/blue} {pos:>[progress_width]}/{len:[progress_width]} [{eta_precise}]"
+            .replace("[emoji]", &console::Emoji("⌛️", "").to_string())
             .replace("[prefix_width]", &prefix_width.to_string())
             .replace("[progress_width]", &messages_len.to_string().chars().count().to_string()),
     )?;
 
+    let extra_steps = 2;
+
     let pb_total = m
-        .add(ProgressBar::new(messages_len as _))
-        .with_style(sty.clone())
-        .with_prefix(format!("{}total", console::Emoji("⌛️", "")))
+        .add(ProgressBar::new(
+            (messages_len + person_records.len() * extra_steps) as _, // 2 per person for toc and unite
+        ))
+        .with_style(pb_total_style.clone())
+        .with_prefix("total")
         .with_message("total progress of all messages");
 
     pb_total.enable_steady_tick(Duration::from_millis(100));
+
+    let pb_style = ProgressStyle::with_template(
+        &"{spinner:.green} [emoji]{prefix:<[prefix_width].red} : {msg}\n[{elapsed_precise}] {wide_bar:.cyan/blue} {pos:>[progress_width]}/{len:[progress_width]}"
+            .replace("[emoji]", &console::Emoji("👤", "").to_string())
+            .replace("[prefix_width]", &prefix_width.to_string())
+            .replace("[progress_width]", &messages_len.to_string().chars().count().to_string()),
+    )?;
 
     let person_records_with_pbs: HashMap<_, (Vec<Record>, ProgressBar)> = person_records
         .into_iter()
         .map(|(person, records)| {
             let messages_len: usize = records.iter().map(|rec| rec.messages.len()).sum();
             let pb = m
-                .add(ProgressBar::new((messages_len + 2) as _)) // 2 for toc and unite
-                .with_style(sty.clone())
+                .add(ProgressBar::new((messages_len + extra_steps) as _)) // 2 for toc and unite
+                .with_style(pb_style.clone())
                 .with_message("Starting")
-                .with_prefix(format!("{}{}", console::Emoji("👤", ""), person.clone()));
+                .with_prefix(person.clone());
 
             pb.enable_steady_tick(Duration::from_millis(100));
 
@@ -413,6 +425,7 @@ fn process_person(
     let toc_path = generate_toc_file(app, name, toc, pb)?;
 
     pb.inc(1);
+    pb_total.inc(1);
 
     pdfs.insert(0, toc_path);
 
@@ -426,6 +439,7 @@ fn process_person(
     command::pdfunite(pdfs)?;
 
     pb.inc(1);
+    pb_total.inc(1);
 
     let result_pds = format!("{name}.pdf");
 
