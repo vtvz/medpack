@@ -3,15 +3,21 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use eyre::Ok;
+use indicatif::ProgressBar;
 use regex::Regex;
 
 use crate::app::App;
-use crate::command::{self, DenoArgs};
+use crate::command::{self, DenoArgs, ROBOTO_FONT_FILE};
 
 pub struct PdfTools;
 
 impl PdfTools {
-    pub fn from_html(app: &App, slug: impl Display, content: &str) -> eyre::Result<PathBuf> {
+    pub fn from_html(
+        app: &App,
+        slug: impl Display,
+        content: &str,
+        pb: &ProgressBar,
+    ) -> eyre::Result<PathBuf> {
         let bootstrap = include_str!("assets/bootstrap-v4.6.2.min.css");
 
         let css_style = r#"
@@ -23,6 +29,18 @@ impl PdfTools {
         ul {
             margin: 0;
             padding-left: 30px;
+        }
+
+        .small-font {
+            font-size: 0.8em;
+        }
+
+        .message-id {
+            font-size: 0.5em;
+        }
+
+        .message-id a {
+            color: #c6c6c6;
         }
         "#;
 
@@ -42,9 +60,9 @@ impl PdfTools {
             "#
         );
 
-        let path = app.tmp_html(format!("{}.html", slug));
+        let path = app.tmp_html(format!("{slug}.html"));
         // let path = format!("test/{}.html", slug);
-        let output_path = app.tmp_html(format!("{}.pdf", slug));
+        let output_path = app.tmp_html(format!("{slug}.pdf"));
 
         fs::write(&path, content).expect("Should have been able to read the file");
 
@@ -58,11 +76,11 @@ impl PdfTools {
                     "--page-width",
                     "210mm",
                     "--page-height",
-                    &format!("{}mm", height),
+                    &format!("{height}mm"),
                     "-T",
-                    &format!("{}mm", margin),
+                    &format!("{margin}mm"),
                     "-B",
-                    &format!("{}mm", margin),
+                    &format!("{margin}mm"),
                 ],
                 &path,
                 &output_path,
@@ -93,10 +111,9 @@ impl PdfTools {
 
             pages = Self::get_pages_count(&output_path)? as _;
 
-            println!(
-                "{} shrink. Size {new_page_height}mm. Pages {pages}",
-                output_path.to_string_lossy(),
-            );
+            pb.set_message(format!(
+                "{slug} shrink. Size {new_page_height}mm. Pages {pages}",
+            ));
 
             if pages == 1 {
                 new_page_height -= page_chunk_height;
@@ -115,18 +132,41 @@ impl PdfTools {
 
             pages = Self::get_pages_count(&output_path)? as _;
 
-            println!(
-                "{} expand. Size {new_page_height}mm. Pages {pages}",
-                output_path.to_string_lossy()
-            );
+            pb.set_message(format!(
+                "{slug} expand. Size {new_page_height}mm. Pages {pages}",
+            ));
         }
 
-        println!(
-            "{} ready. Size {new_page_height}mm. Pages {pages}",
-            output_path.to_string_lossy()
-        );
+        pb.set_message(format!(
+            "{slug} ready. Size {new_page_height}mm. Pages {pages}",
+        ));
 
         Ok(output_path)
+    }
+
+    pub fn add_page_numbers(in_path: &Path, out_path: &Path) -> eyre::Result<PathBuf> {
+        let font_path = ROBOTO_FONT_FILE.to_str().unwrap();
+        let font = format!("Roboto={font_path}");
+
+        let args: Vec<&dyn AsRef<std::ffi::OsStr>> = vec![
+            &"-add-text",
+            &"ст. %Page",
+            &"-bottomright",
+            &"5 5",
+            &"-load-ttf",
+            &font,
+            &"-font",
+            &"Roboto",
+            &"-font-size",
+            &"11",
+            &in_path,
+            &"-o",
+            &out_path,
+        ];
+
+        command::cpdf(args)?;
+
+        Ok(out_path.to_path_buf())
     }
 
     pub fn label(
@@ -135,6 +175,7 @@ impl PdfTools {
         left_text: &str,
         right_text: &str,
         bottom_text: &str,
+        bottom_link: &str,
     ) -> eyre::Result<PathBuf> {
         // let text_color = "black";
         // let outline_color = "white";
@@ -148,6 +189,7 @@ impl PdfTools {
             left_text,
             right_text,
             bottom_text,
+            bottom_link,
         })?;
 
         Ok(out_path.to_path_buf())

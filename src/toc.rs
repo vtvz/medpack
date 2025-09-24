@@ -8,16 +8,18 @@ pub struct TocItem<'a> {
 }
 
 pub struct Toc<'a> {
+    pub chat_id: i64,
     pub items: Vec<TocItem<'a>>,
 }
 
 impl<'a> Toc<'a> {
-    pub fn new() -> Self {
-        Self::new_from(Vec::new())
+    pub fn new(chat_id: i64) -> Self {
+        Self::new_from(chat_id, Vec::new())
     }
 
-    pub fn new_from(toc_items: impl IntoIterator<Item = TocItem<'a>>) -> Self {
+    pub fn new_from(chat_id: i64, toc_items: impl IntoIterator<Item = TocItem<'a>>) -> Self {
         Self {
+            chat_id,
             items: toc_items.into_iter().collect(),
         }
     }
@@ -36,17 +38,40 @@ impl<'a> Toc<'a> {
                 current_page += item.pages;
                 format!(
                     r#"
-                <tr>
-                    <td>{}</td>
-                    <td>{}</td>
-                    <td style="width: 100%"><ul><li>{}</li></ul></td>
-                    <td style="text-align: right"> {}</td>
-                </tr>
-                "#,
-                    index + 1,
-                    item.record.date,
-                    item.record.tags.join("</li><li>"),
-                    current_page - item.pages + 1,
+                        <tr>
+                            <td>{index}</td>
+                            <td>{date}<div class="message-id"><a href="https://t.me/c/{chat_id}/{id}">{id}</div></td>
+                            <td style="width: 100%">
+                                {place}
+                                <ul><li>{tags}</li></ul>
+                                {doctor}
+                            </td>
+                            <td style="text-align: right">{page}</td>
+                        </tr>
+                    "#,
+                    index = index + 1,
+                    chat_id = self.chat_id,
+                    id = item
+                        .record
+                        .messages
+                        .first()
+                        .map(|message| message.id)
+                        .unwrap_or_default(),
+                    date = item.record.date,
+                    tags = item.record.tags.join("</li><li>"),
+                    place = item
+                        .record
+                        .place
+                        .as_ref()
+                        .map(|place| format!("<div class='small-font'>{place}</div>"))
+                        .unwrap_or_default(),
+                    doctor = item
+                        .record
+                        .doctor
+                        .as_ref()
+                        .map(|doctor| format!("<div class='small-font'>{doctor}</div>"))
+                        .unwrap_or_default(),
+                    page = current_page - item.pages + 1,
                 )
             })
             .join("");

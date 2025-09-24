@@ -79,13 +79,26 @@ pub struct Message {
     pub export_path: Option<PathBuf>,
 }
 
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Record {
+    pub date: String,
+    pub tags: Vec<String>,
+    pub person: String,
+    #[serde(default)]
+    pub messages: Vec<Message>,
+    pub doctor: Option<String>,
+    pub place: Option<String>,
+}
+
 impl Message {
     pub fn is_text_empty(&self) -> bool {
         self.text_entities.is_empty()
     }
 
     pub fn is_photo(&self) -> bool {
-        self.photo.is_some() || self.mime_type == Some("image/jpeg".into())
+        self.photo.is_some()
+            || self.mime_type == Some("image/jpeg".into())
+            || self.mime_type == Some("image/png".into())
     }
 
     pub fn unwrap_export_path(&self) -> PathBuf {
@@ -98,7 +111,9 @@ impl Message {
             export_path.push(photo);
 
             export_path
-        } else if self.mime_type == Some("image/jpeg".into()) {
+        } else if self.mime_type == Some("image/jpeg".into())
+            || self.mime_type == Some("image/png".into())
+        {
             self.unwrap_file()
         } else {
             panic!("File should exist")
@@ -138,13 +153,4 @@ impl Message {
             Err(err) => Err(err.into()),
         }
     }
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Record {
-    pub date: String,
-    pub tags: Vec<String>,
-    pub person: String,
-    #[serde(default)]
-    pub messages: Vec<Message>,
 }

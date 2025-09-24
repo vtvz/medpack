@@ -4,18 +4,24 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use eyre::{eyre, Ok};
+use eyre::{Ok, eyre};
 use lazy_static::lazy_static;
 use tempdir::TempDir;
 
+use crate::write_err;
+
 pub fn cmd(cmd: &str, args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> eyre::Result<String> {
-    let res = Command::new(cmd).args(args).output()?;
+    let mut cmd = Command::new(cmd);
+    cmd.args(args);
+
+    let res = cmd.output()?;
 
     if res.status.success() {
         Ok(String::from_utf8(res.stdout)?)
     } else {
-        println!("{}", String::from_utf8(res.stdout)?);
-        println!("{}", String::from_utf8(res.stderr)?);
+        write_err(String::from_utf8(res.stderr)?)?;
+        write_err(String::from_utf8(res.stdout)?)?;
+
         Err(eyre!("Exited with exit code {}", res.status))
     }
 }
@@ -34,6 +40,14 @@ pub fn pdfunite(
     pdfs: impl IntoIterator<Item = impl AsRef<OsStr>> + std::fmt::Debug,
 ) -> eyre::Result<String> {
     cmd("pdfunite", pdfs)
+}
+
+pub fn cpdf(params: impl IntoIterator<Item = impl AsRef<OsStr>>) -> eyre::Result<String> {
+    cmd("cpdf", params)
+}
+
+pub fn ocrmypdf(params: impl IntoIterator<Item = impl AsRef<OsStr>>) -> eyre::Result<String> {
+    cmd("ocrmypdf", params)
 }
 
 pub fn wkhtmltopdf(
@@ -61,11 +75,11 @@ lazy_static! {
 
         file_path
     };
-    static ref ROBOTO_FONT_FILE: PathBuf = {
-        let file_path = TEMP_DIR.path().join("Roboto-Regular.ttf");
+    pub static ref ROBOTO_FONT_FILE: PathBuf = {
+        let file_path = TEMP_DIR.path().join("font.ttf");
 
         let mut tmp_file = fs::File::create(file_path.clone()).unwrap();
-        let content = include_bytes!("./assets/Roboto-Regular.ttf");
+        let content = include_bytes!("./assets/Roboto-Medium.ttf");
 
         tmp_file.write_all(content).unwrap();
 
@@ -79,6 +93,7 @@ pub struct DenoArgs<'a> {
     pub left_text: &'a str,
     pub right_text: &'a str,
     pub bottom_text: &'a str,
+    pub bottom_link: &'a str,
 }
 
 pub fn deno(args: DenoArgs) -> eyre::Result<String> {
@@ -100,6 +115,8 @@ pub fn deno(args: DenoArgs) -> eyre::Result<String> {
         args.right_text,
         "-b",
         args.bottom_text,
+        "-u",
+        args.bottom_link,
         "-f",
         font_path,
     ];
