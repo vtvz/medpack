@@ -8,6 +8,8 @@ use eyre::{Ok, eyre};
 use lazy_static::lazy_static;
 use tempdir::TempDir;
 
+use crate::write_err;
+
 pub fn cmd(cmd: &str, args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> eyre::Result<String> {
     let mut cmd = Command::new(cmd);
     cmd.args(args);
@@ -17,8 +19,9 @@ pub fn cmd(cmd: &str, args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> eyre
     if res.status.success() {
         Ok(String::from_utf8(res.stdout)?)
     } else {
-        eprintln!("{}", String::from_utf8(res.stdout)?);
-        eprintln!("{}", String::from_utf8(res.stderr)?);
+        write_err(String::from_utf8(res.stderr)?)?;
+        write_err(String::from_utf8(res.stdout)?)?;
+
         Err(eyre!("Exited with exit code {}", res.status))
     }
 }

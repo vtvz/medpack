@@ -1,12 +1,14 @@
 #![feature(exit_status_error)]
 use std::collections::HashMap;
-use std::fs;
+use std::fmt::Display;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use clap::Parser;
 use eyre::Ok;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
@@ -124,9 +126,19 @@ fn main() -> eyre::Result<()> {
 
     let Err(err) = res else { return Ok(()) };
 
-    eprintln!("{err:?}");
+    write_err(format!("{err:?}"))?;
 
     Err(err)
+}
+
+fn write_err(data: impl Display) -> eyre::Result<()> {
+    let mut file = OpenOptions::new().append(true).open("medpack-err.log")?;
+
+    eprintln!("{data}");
+
+    writeln!(file, "{data}")?;
+
+    Ok(())
 }
 
 fn app(args: Cli) -> eyre::Result<()> {
@@ -182,9 +194,11 @@ fn app(args: Cli) -> eyre::Result<()> {
         .keys()
         .map(|name| name.chars().count())
         .max()
-        .unwrap_or(10);
+        .unwrap_or(10)
+        + 1; // 1 for emoji
 
     let m = MultiProgress::new();
+
     let sty = ProgressStyle::with_template(
         &"{spinner:.green} {prefix:<[prefix_width].red} : {msg}\n[{elapsed_precise}] {wide_bar:.cyan/blue} {pos:>[progress_width]}/{len:[progress_width]}"
             .replace("[prefix_width]", &prefix_width.to_string())
@@ -194,26 +208,28 @@ fn app(args: Cli) -> eyre::Result<()> {
     let pb_total = m
         .add(ProgressBar::new(messages_len as _))
         .with_style(sty.clone())
-        .with_prefix("total")
+        .with_prefix(format!("{}total", console::Emoji("⌛️", "")))
         .with_message("total progress of all messages");
 
     pb_total.enable_steady_tick(Duration::from_millis(100));
 
-    let person_records_pbs: HashMap<_, (Vec<Record>, ProgressBar)> = person_records
+    let person_records_with_pbs: HashMap<_, (Vec<Record>, ProgressBar)> = person_records
         .into_iter()
         .map(|(person, records)| {
             let messages_len: usize = records.iter().map(|rec| rec.messages.len()).sum();
-            let pb = m.add(ProgressBar::new(messages_len as _));
+            let pb = m
+                .add(ProgressBar::new((messages_len + 2) as _)) // 2 for toc and unite
+                .with_style(sty.clone())
+                .with_message("Starting")
+                .with_prefix(format!("{}{}", console::Emoji("👤", ""), person.clone()));
+
             pb.enable_steady_tick(Duration::from_millis(100));
-            pb.set_style(sty.clone());
-            pb.set_message("Starting");
-            pb.set_prefix(person.clone());
 
             (person, (records, pb))
         })
         .collect();
 
-    let result: Result<Vec<_>, _> = person_records_pbs
+    let result: Result<Vec<_>, _> = person_records_with_pbs
         .into_par_iter()
         // .take_any(1)
         .map(|(name, (recs, pb))| process_person(&app, &name, chat_id, &recs, &pb, &pb_total))
@@ -245,8 +261,10 @@ fn process_message(app: &App, msg: &Message, pb: &ProgressBar) -> eyre::Result<P
         if !app.process_ocr {
             path_img
         } else {
-            pb.set_message(format!("process ocr for {}", msg.id));
+            pb.set_message(format!("process ocr for {} message", msg.id));
             let path_res = app.tmp_img(format!("{}-ocr.pdf", msg.id));
+
+            let started = Instant::now();
 
             command::ocrmypdf([
                 "-l",
@@ -255,7 +273,13 @@ fn process_message(app: &App, msg: &Message, pb: &ProgressBar) -> eyre::Result<P
                 &path_res.to_string_lossy(),
             ])?;
 
-            pb.set_message(format!("process ocr complete {}", msg.id));
+            pb.println(format!(
+                "ocr processing for {} message is done in {}",
+                msg.id,
+                HumanDuration(started.elapsed())
+            ));
+
+            pb.set_message(format!("process ocr complete for {} message", msg.id));
 
             path_res
         }
@@ -363,11 +387,11 @@ fn process_person(
     let results = recs
         .par_iter()
         .map(|rec| {
-            pb.set_message(format!("process {} rec", rec.date));
+            pb.set_message(format!("process {} record", rec.date));
 
             let res = process_record(app, chat_id, rec, pb, pb_total);
 
-            pb.set_message(format!("complete {} rec", rec.date));
+            pb.set_message(format!("complete {} record", rec.date));
 
             res
         })
@@ -380,7 +404,9 @@ fn process_person(
     let mut toc = Toc::new(chat_id);
     toc_items.into_iter().for_each(|item| toc.append(item));
 
-    let toc_path = generate_toc_file(app, name, toc, &pb)?;
+    let toc_path = generate_toc_file(app, name, toc, pb)?;
+
+    pb.inc(1);
 
     pdfs.insert(0, toc_path);
 
@@ -392,6 +418,8 @@ fn process_person(
     pdfs.push(united_pdf.clone());
 
     command::pdfunite(pdfs)?;
+
+    pb.inc(1);
 
     let result_pds = format!("{name}.pdf");
 
