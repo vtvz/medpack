@@ -198,32 +198,32 @@ fn app(args: Cli) -> eyre::Result<()> {
         .keys()
         .map(|name| name.chars().count())
         .max()
-        .unwrap_or(10)
-        + 1; // 1 for emoji
+        .unwrap_or(10);
 
     let m = MultiProgress::new();
 
     let pb_total_style = ProgressStyle::with_template(
-        &"{spinner:.green} [emoji]{prefix:<[prefix_width].red} : {msg}\n[{elapsed_precise}] {wide_bar:.cyan/blue} {pos:>[progress_width]}/{len:[progress_width]} [{eta_precise}]"
+        &"{spinner:.green} [emoji]{prefix:<[prefix_width].red} | {msg}\n[{elapsed_precise}] {wide_bar:.cyan/blue} {pos:>[progress_width]}/{len:[progress_width]} [{eta_precise}]"
             .replace("[emoji]", &console::Emoji("⌛️", "").to_string())
             .replace("[prefix_width]", &prefix_width.to_string())
             .replace("[progress_width]", &messages_len.to_string().chars().count().to_string()),
     )?;
 
+    // ToC and Unite
     let extra_steps = 2;
 
     let pb_total = m
         .add(ProgressBar::new(
-            (messages_len + person_records.len() * extra_steps) as _, // 2 per person for toc and unite
+            (messages_len + person_records.len() * extra_steps) as _,
         ))
-        .with_style(pb_total_style.clone())
+        .with_style(pb_total_style)
         .with_prefix("total")
         .with_message("total progress of all messages");
 
     pb_total.enable_steady_tick(Duration::from_millis(100));
 
     let pb_style = ProgressStyle::with_template(
-        &"{spinner:.green} [emoji]{prefix:<[prefix_width].red} : {msg}\n[{elapsed_precise}] {wide_bar:.cyan/blue} {pos:>[progress_width]}/{len:[progress_width]}"
+        &"{spinner:.green} [emoji]{prefix:<[prefix_width].red} | {msg}\n[{elapsed_precise}] {wide_bar:.cyan/blue} {pos:>[progress_width]}/{len:[progress_width]}"
             .replace("[emoji]", &console::Emoji("👤", "").to_string())
             .replace("[prefix_width]", &prefix_width.to_string())
             .replace("[progress_width]", &messages_len.to_string().chars().count().to_string()),
@@ -234,7 +234,7 @@ fn app(args: Cli) -> eyre::Result<()> {
         .map(|(person, records)| {
             let messages_len: usize = records.iter().map(|rec| rec.messages.len()).sum();
             let pb = m
-                .add(ProgressBar::new((messages_len + extra_steps) as _)) // 2 for toc and unite
+                .add(ProgressBar::new((messages_len + extra_steps) as _))
                 .with_style(pb_style.clone())
                 .with_message("Starting")
                 .with_prefix(person.clone());
