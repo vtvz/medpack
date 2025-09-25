@@ -188,12 +188,6 @@ fn app(args: Cli) -> eyre::Result<()> {
         .map(|rec| (rec.person.clone(), rec))
         .into_group_map();
 
-    let messages_len: usize = person_records
-        .values()
-        .flat_map(|records| records.iter())
-        .map(|record| record.messages.len())
-        .sum();
-
     let prefix_width = person_records
         .keys()
         .map(|name| name.chars().count())
@@ -202,11 +196,14 @@ fn app(args: Cli) -> eyre::Result<()> {
 
     let m = MultiProgress::new();
 
+    let records_len: usize = person_records.values().map(|records| records.len()).sum();
+    let progress_width = records_len.to_string().chars().count();
+
     let pb_total_style = ProgressStyle::with_template(
         &"{spinner:.green} [emoji]{prefix:<[prefix_width].red} | {msg}\n[{elapsed_precise}] {wide_bar:.cyan/blue} {pos:>[progress_width]}/{len:[progress_width]} [{eta_precise}]"
             .replace("[emoji]", &console::Emoji("⌛️", "").to_string())
             .replace("[prefix_width]", &prefix_width.to_string())
-            .replace("[progress_width]", &messages_len.to_string().chars().count().to_string()),
+            .replace("[progress_width]", &progress_width.to_string()),
     )?;
 
     // ToC and Unite
@@ -214,7 +211,7 @@ fn app(args: Cli) -> eyre::Result<()> {
 
     let pb_total = m
         .add(ProgressBar::new(
-            (messages_len + person_records.len() * extra_steps) as _,
+            (records_len + person_records.len() * extra_steps) as _,
         ))
         .with_style(pb_total_style)
         .with_prefix("total")
@@ -226,15 +223,14 @@ fn app(args: Cli) -> eyre::Result<()> {
         &"{spinner:.green} [emoji]{prefix:<[prefix_width].red} | {msg}\n[{elapsed_precise}] {wide_bar:.cyan/blue} {pos:>[progress_width]}/{len:[progress_width]}"
             .replace("[emoji]", &console::Emoji("👤", "").to_string())
             .replace("[prefix_width]", &prefix_width.to_string())
-            .replace("[progress_width]", &messages_len.to_string().chars().count().to_string()),
+            .replace("[progress_width]", &progress_width.to_string()),
     )?;
 
     let person_records_with_pbs: HashMap<_, (Vec<Record>, ProgressBar)> = person_records
         .into_iter()
         .map(|(person, records)| {
-            let messages_len: usize = records.iter().map(|rec| rec.messages.len()).sum();
             let pb = m
-                .add(ProgressBar::new((messages_len + extra_steps) as _))
+                .add(ProgressBar::new((records.len() + extra_steps) as _))
                 .with_style(pb_style.clone())
                 .with_message("Starting")
                 .with_prefix(person.clone());
@@ -274,31 +270,7 @@ fn process_message(app: &App, msg: &Message, pb: &ProgressBar) -> eyre::Result<P
             &path_img.to_string_lossy(),
         ])?;
 
-        if !app.process_ocr {
-            path_img
-        } else {
-            pb.set_message(format!("process ocr for {} message", msg.id));
-            let path_res = app.tmp_img(format!("{}-ocr.pdf", msg.id));
-
-            let started = Instant::now();
-
-            command::ocrmypdf([
-                "-l",
-                "rus+eng",
-                &path_img.to_string_lossy(),
-                &path_res.to_string_lossy(),
-            ])?;
-
-            pb.println(format!(
-                "ocr processing for {} message is done in {}",
-                msg.id,
-                HumanDuration(started.elapsed())
-            ));
-
-            pb.set_message(format!("process ocr complete for {} message", msg.id));
-
-            path_res
-        }
+        path_img
     } else {
         let content = msg.text_entities[1..]
             .iter()
@@ -316,52 +288,83 @@ fn process_record<'a>(
     chat_id: i64,
     rec: &'a Record,
     pb: &ProgressBar,
-    pb_total: &ProgressBar,
-) -> eyre::Result<(Vec<PathBuf>, Vec<TocItem<'a>>)> {
+) -> eyre::Result<(PathBuf, TocItem<'a>)> {
     let mut pdfs = vec![];
-    let mut toc_items = vec![];
-    let mut pages = 0;
 
-    for (i, msg) in rec.messages.iter().enumerate() {
+    for msg in &rec.messages {
         pb.set_message(format!("process {} message", msg.id));
 
         let pdf = process_message(app, msg, pb)?;
 
-        let mut tags = rec.tags.join(", ");
-        if tags.chars().count() > 58 {
-            tags = format!("{}...", tags.chars().take(55).collect::<String>());
-        }
-        let label = format!("{}: {}", tags, &rec.date);
-
-        let paging = if msg.is_photo() {
-            format!("стр {} из {}", i + 1, rec.messages.len())
-        } else {
-            "стр %Page из %EndPage".to_string()
-        };
-
-        let labeled_pdf = app.tmp_label(format!("{}.pdf", msg.id));
-        let labeled_pdf = PdfTools::label(
-            &pdf,
-            &labeled_pdf,
-            &paging,
-            &label,
-            &msg.id.to_string(),
-            &format!("https://t.me/c/{chat_id}/{id}", id = msg.id),
-        )?;
-
-        pages += PdfTools::get_pages_count(&pdf)?;
-
-        pdfs.push(labeled_pdf);
-
-        pb.inc(1);
-        pb_total.inc(1);
+        pdfs.push(pdf);
 
         pb.set_message(format!("complete {} message", msg.id));
     }
 
-    toc_items.push(TocItem { record: rec, pages });
+    let record_pdf = if pdfs.len() == 1 {
+        pdfs.first().cloned().expect("Should be one")
+    } else {
+        let record_pdf = app.tmp_records(format!("{}.pdf", rec.record_id()));
 
-    Ok((pdfs, toc_items))
+        pdfs.push(record_pdf.clone());
+
+        command::pdfunite(pdfs)?;
+
+        record_pdf
+    };
+
+    // OCR
+    let record_pdf = if !app.process_ocr || !rec.is_images() {
+        record_pdf
+    } else {
+        pb.set_message(format!("process ocr for {} record", rec.record_id()));
+        let path_res = app.tmp_records(format!("{}-ocr.pdf", rec.record_id()));
+
+        let started = Instant::now();
+
+        command::ocrmypdf([
+            "-l",
+            "rus+eng",
+            &record_pdf.to_string_lossy(),
+            &path_res.to_string_lossy(),
+        ])?;
+
+        pb.println(format!(
+            "ocr processing for {} record is done in {}",
+            rec.record_id(),
+            HumanDuration(started.elapsed())
+        ));
+
+        pb.set_message(format!(
+            "process ocr complete for {} record",
+            rec.record_id()
+        ));
+
+        path_res
+    };
+
+    // Label pdf
+    let mut tags = rec.tags.join(", ");
+    if tags.chars().count() > 58 {
+        tags = format!("{}...", tags.chars().take(55).collect::<String>());
+    }
+    let label = format!("{}: {}", tags, &rec.date);
+
+    let paging = "стр %Page из %EndPage".to_string();
+
+    let labeled_pdf = app.tmp_label(format!("{}.pdf", rec.record_id()));
+    let labeled_pdf = PdfTools::label(
+        &record_pdf,
+        &labeled_pdf,
+        &paging,
+        &label,
+        &rec.first_message_id().to_string(),
+        &format!("https://t.me/c/{chat_id}/{id}", id = rec.first_message_id()),
+    )?;
+
+    let pages = PdfTools::get_pages_count(&labeled_pdf)?;
+
+    Ok((labeled_pdf, TocItem { record: rec, pages }))
 }
 
 fn generate_toc_file(
@@ -405,22 +408,23 @@ fn process_person(
     let results = recs
         .par_iter()
         .map(|rec| {
-            pb.set_message(format!("process {} record", rec.date));
+            pb.set_message(format!("process {} record", rec.record_id()));
 
-            let res = process_record(app, chat_id, rec, pb, pb_total);
+            let res = process_record(app, chat_id, rec, pb);
 
-            pb.set_message(format!("complete {} record", rec.date));
+            pb.inc(1);
+            pb_total.inc(1);
+
+            pb.set_message(format!("complete {} record", rec.record_id()));
 
             res
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let (pdfs, toc_items): (Vec<_>, Vec<_>) = results.into_iter().unzip();
-
-    let mut pdfs = pdfs.into_iter().flatten().collect_vec();
+    let (mut pdfs, toc_items): (Vec<_>, Vec<_>) = results.into_iter().unzip();
 
     let mut toc = Toc::new(chat_id);
-    toc_items.into_iter().for_each(|item| toc.append(item));
+    toc.append(toc_items);
 
     let toc_path = generate_toc_file(app, name, toc, pb)?;
 

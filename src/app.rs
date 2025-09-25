@@ -10,6 +10,7 @@ pub struct App {
     tmp_img: Temp,
     tmp_html: Temp,
     tmp_label: Temp,
+    tmp_records: Temp,
     pub process_ocr: bool,
     pub unadaptive_text_pages: bool,
 }
@@ -32,6 +33,7 @@ impl App {
             tmp_img: Self::generate_tmp("img", cli.preserve_tmp)?,
             tmp_html: Self::generate_tmp("html", cli.preserve_tmp)?,
             tmp_label: Self::generate_tmp("label", cli.preserve_tmp)?,
+            tmp_records: Self::generate_tmp("records", cli.preserve_tmp)?,
             process_ocr: !cli.no_ocr,
             unadaptive_text_pages: cli.unadaptive_text_pages,
         })
@@ -55,5 +57,9 @@ impl App {
 
     pub fn tmp_label(&self, file: impl AsRef<Path>) -> PathBuf {
         Self::tmp_file(self.tmp_label.as_ref(), file)
+    }
+
+    pub fn tmp_records(&self, file: impl AsRef<Path>) -> PathBuf {
+        Self::tmp_file(self.tmp_records.as_ref(), file)
     }
 }

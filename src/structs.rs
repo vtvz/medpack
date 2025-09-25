@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use chrono::NaiveDateTime;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -88,6 +89,27 @@ pub struct Record {
     pub messages: Vec<Message>,
     pub doctor: Option<String>,
     pub place: Option<String>,
+}
+
+impl Record {
+    pub fn record_id(&self) -> String {
+        self.messages
+            .iter()
+            .map(|message| message.id)
+            .sorted()
+            .join("-")
+    }
+
+    pub fn first_message_id(&self) -> i64 {
+        self.messages
+            .first()
+            .map(|message| message.id)
+            .unwrap_or_default()
+    }
+
+    pub fn is_images(&self) -> bool {
+        self.messages.iter().any(|message| message.is_photo())
+    }
 }
 
 impl Message {
