@@ -6,8 +6,22 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
+use async_openai::types::responses::{
+    Content,
+    ContentType,
+    CreateResponseArgs,
+    Input,
+    InputContent,
+    InputFileArgs,
+    InputItem,
+    InputMessageArgs,
+    OutputContent,
+    Response,
+    Role,
+};
+use base64::Engine;
 use clap::Parser;
-use eyre::Ok;
+use eyre::{Ok, bail};
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -136,7 +150,10 @@ fn main() -> eyre::Result<()> {
 }
 
 fn write_err(data: impl Display) -> eyre::Result<()> {
-    let mut file = OpenOptions::new().append(true).open("medpack-err.log")?;
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("medpack-err.log")?;
 
     eprintln!("{data}");
 
@@ -343,6 +360,12 @@ fn process_record<'a>(
         path_res
     };
 
+    // analyze with chatgpt
+    //
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    rt.block_on(analyze_with_llm(&record_pdf))?;
+
     // Label pdf
     let mut tags = rec.tags.join(", ");
     if tags.chars().count() > 58 {
@@ -365,6 +388,95 @@ fn process_record<'a>(
     let pages = PdfTools::get_pages_count(&labeled_pdf)?;
 
     Ok((labeled_pdf, TocItem { record: rec, pages }))
+}
+
+async fn analyze_with_llm(record_pdf: &PathBuf) -> eyre::Result<()> {
+    let client = async_openai::Client::new();
+
+    let bytes = fs::read(record_pdf)?;
+
+    let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+
+    let data_url = format!("data:application/pdf;base64,{}", b64);
+
+    let file_part = ContentType::InputFile(
+        InputFileArgs::default()
+            .file_data(data_url)
+            .filename("document.pdf")
+            .build()?,
+    );
+
+    let msg_with_file = InputItem::Message(
+        InputMessageArgs::default()
+            .role(Role::User)
+            .content(InputContent::InputItemContentList(vec![file_part]))
+            .build()?,
+    );
+
+    let prompt = "
+Проанализируй медицинский pdf-документ и извлеки ключевые слова и термины:
+- диагнозы, исследования, аббревиатуры, показатели
+- не включай имена, фамилии, дозировки, даты и прописанные препараты
+- используй аббревиатуры там, где это возможно
+- все слова выводи строчными буквами
+- результат выведи в одну строку через запятую
+- если ключевое слово указывает на проблему, отклонение или патологию, выдели его тегом <b>
+";
+
+    let msg_with_prompt = InputItem::Message(
+        InputMessageArgs::default()
+            .role(Role::User)
+            .content(InputContent::TextInput(prompt.into()))
+            .build()?,
+    );
+
+    let req = CreateResponseArgs::default()
+        // Модели с vision поддержкой PDF; gpt-4.1 — прямой путь.
+        .model("gpt-4.1")
+        .input(Input::Items(vec![msg_with_file, msg_with_prompt]))
+        .max_output_tokens(200u32) // чтобы ответ был коротким
+        .build()?;
+
+    let resp = client.responses().create(req).await?;
+
+    let text = extract_text(&resp);
+
+    write_err(text)?;
+
+    eyre::bail!("no");
+
+    Ok(())
+}
+
+fn extract_text(resp: &Response) -> String {
+    // 1) если SDK положил агрегированный текст — используем
+    if let Some(t) = resp.output_text.as_deref() {
+        return t.to_owned();
+    }
+
+    // 2) иначе вытаскиваем руками из output -> Message -> content -> OutputText
+    let parts = resp.output.iter().filter_map(|oc| {
+        match oc {
+            OutputContent::Message(msg) => {
+                let s = msg
+                    .content
+                    .iter()
+                    .filter_map(|c| {
+                        match c {
+                            Content::OutputText(t) => Some(t.text.as_str()),
+                            // можно отладочно логировать отказ
+                            Content::Refusal(_r) => None,
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join("");
+                if s.is_empty() { None } else { Some(s) }
+            },
+            _ => None, // тут могут быть вызовы тулов и пр., для нашей задачи не нужны
+        }
+    });
+
+    parts.collect::<Vec<_>>().join("\n")
 }
 
 fn generate_toc_file(
