@@ -45,6 +45,10 @@ struct Cli {
     /// Source locations
     #[arg(default_values_t = vec![".".to_string()])]
     sources: Vec<String>,
+
+    /// Filter people to process (all by default)
+    #[arg(short = 'p')]
+    people: Vec<String>,
 }
 
 fn get_export_result(export_path: &str) -> eyre::Result<Export> {
@@ -110,7 +114,11 @@ fn app(args: Cli) -> eyre::Result<()> {
 
     let chat_id = exports.first().map(|export| export.id).unwrap_or_default();
 
-    let person_records = Categorizer::process_exports(exports);
+    let mut person_records = Categorizer::process_exports(exports);
+
+    if !args.people.is_empty() {
+        person_records.retain(|name, _| args.people.contains(name));
+    }
 
     let prefix_width = person_records
         .keys()
