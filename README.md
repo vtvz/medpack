@@ -131,9 +131,9 @@ Messages can contain YAML blocks with medical record metadata:
 date: 2023.12.22
 person: John Doe
 tags:
-- cardiology
-- checkup
-- ECG
+  - cardiology
+  - checkup
+  - ECG
 place: City Hospital
 doctor: Dr. Smith
 ```
@@ -156,6 +156,28 @@ For messages without images or PDF files, any text following the YAML block will
 | `tags`   | Array  | List of tags/categories for the record   | ✅       |
 | `place`  | String | Medical facility or location             | ❌       |
 | `doctor` | String | Doctor's name                            | ❌       |
+
+#### 🏷️ HTML Tags Support
+
+Tags now support HTML formatting for enhanced visual presentation in the generated PDFs. This is particularly useful for highlighting important issues or categorizing records with visual emphasis.
+
+**Supported HTML Tags:**
+
+- `<b>` - Bold text for highlighting critical issues
+- `<i>` - Italic text for emphasis
+- `<u>` - Underlined text
+- `<span>` - With CSS styling for custom formatting
+
+**Examples:**
+
+```yaml
+tags:
+  - cardiology
+  - <b>urgent</b>
+  - <i>follow-up required</i>
+  - ECG
+  - <b style="color: red;">critical</b>
+```
 
 ## 📤 Output
 
