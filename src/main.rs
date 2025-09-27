@@ -11,13 +11,16 @@ use eyre::Ok;
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use scraper::Html;
 
 use crate::app::App;
+use crate::categorizer::Categorizer;
 use crate::pdf_tools::PdfTools;
 use crate::structs::{Export, Message, Record};
 use crate::toc::{Toc, TocItem};
 
 mod app;
+mod categorizer;
 mod command;
 mod pdf_tools;
 mod structs;
@@ -42,72 +45,6 @@ struct Cli {
     /// Source locations
     #[arg(default_values_t = vec![".".to_string()])]
     sources: Vec<String>,
-}
-
-fn group_to_record(group: Vec<Message>) -> Record {
-    let mut record = group
-        .first()
-        .expect("Group shouldn't empty")
-        .get_record()
-        .expect("Group must be pre-parsed");
-
-    record.messages = group;
-
-    record
-}
-
-fn group_messages(mut msgs: Vec<Message>) -> Vec<Record> {
-    msgs.sort_by_key(|msg| msg.id);
-
-    // Group is a collection of related messages
-    let mut group: Vec<Message> = vec![];
-    let mut records = vec![];
-    let mut continue_group = false;
-
-    for msg in msgs {
-        // Will this messages be pushed to group
-        let to_push;
-
-        // If true will create record with grouped messages
-        // `group` variable will be emptied
-        let close_prev;
-
-        // Record in msg is an `yaml` block with metadata
-        if msg.has_record() {
-            to_push = true;
-            close_prev = true;
-
-            // Image with record could have following image
-            continue_group = msg.is_photo();
-        } else if msg.is_photo() && msg.is_text_empty() && continue_group {
-            // Image without record can be a part of group
-            // True if group continues
-            to_push = true;
-            close_prev = false;
-        } else {
-            // Only images can create group.
-            // Text and PDFs without Record won't be added to document
-            to_push = false;
-            close_prev = true;
-
-            continue_group = false;
-        }
-
-        if close_prev && !group.is_empty() {
-            records.push(group_to_record(group));
-            group = vec![];
-        }
-
-        if to_push {
-            group.push(msg);
-        }
-    }
-
-    if !group.is_empty() {
-        records.push(group_to_record(group));
-    }
-
-    records
 }
 
 fn get_export_result(export_path: &str) -> eyre::Result<Export> {
@@ -135,8 +72,16 @@ fn main() -> eyre::Result<()> {
     Err(err)
 }
 
+fn strip_html_tags(html: &str) -> String {
+    let fragment = Html::parse_fragment(html);
+    fragment.root_element().text().collect::<Vec<_>>().join(" ")
+}
+
 fn write_err(data: impl Display) -> eyre::Result<()> {
-    let mut file = OpenOptions::new().append(true).open("medpack-err.log")?;
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("medpack-err.log")?;
 
     eprintln!("{data}");
 
@@ -165,28 +110,7 @@ fn app(args: Cli) -> eyre::Result<()> {
 
     let chat_id = exports.first().map(|export| export.id).unwrap_or_default();
 
-    let messages = exports
-        .into_iter()
-        .flat_map(|export| export.messages)
-        .filter(|msg| msg.type_field == "message" && msg.contact_information.is_none())
-        .sorted_by_key(|msg| (msg.id, msg.date, msg.edited.unwrap_or_default()))
-        .rev()
-        .dedup_by(|a, b| a.id == b.id)
-        .collect_vec();
-
-    // I do this for consistency as messages in different topics can interfere with each other
-    let grouped_by_topic = messages
-        .into_iter()
-        .map(|msg| (msg.reply_to_message_id, msg))
-        .into_group_map();
-
-    let person_records = grouped_by_topic
-        .into_values()
-        .flat_map(group_messages)
-        .sorted_by_key(|rec| rec.date.clone())
-        .rev()
-        .map(|rec| (rec.person.clone(), rec))
-        .into_group_map();
+    let person_records = Categorizer::process_exports(exports);
 
     let prefix_width = person_records
         .keys()
@@ -243,6 +167,7 @@ fn app(args: Cli) -> eyre::Result<()> {
 
     let result: Result<Vec<_>, _> = person_records_with_pbs
         .into_par_iter()
+        // .filter(|(name, _)| name == "nataly")
         // .take_any(1)
         .map(|(name, (recs, pb))| process_person(&app, &name, chat_id, &recs, &pb, &pb_total))
         .collect();
@@ -344,7 +269,13 @@ fn process_record<'a>(
     };
 
     // Label pdf
-    let mut tags = rec.tags.join(", ");
+    let mut tags = rec
+        .tags
+        .iter()
+        .map(|tag| strip_html_tags(tag))
+        .map(|tag| tag.trim().to_string())
+        .join(", ");
+
     if tags.chars().count() > 58 {
         tags = format!("{}...", tags.chars().take(55).collect::<String>());
     }
