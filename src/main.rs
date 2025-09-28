@@ -6,6 +6,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
+use backon::{BlockingRetryable, ConstantBuilder, ExponentialBuilder};
 use clap::Parser;
 use eyre::Ok;
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
@@ -255,12 +256,18 @@ fn process_record<'a>(
 
         let started = Instant::now();
 
-        command::ocrmypdf([
-            "-l",
-            "rus+eng",
-            &record_pdf.to_string_lossy(),
-            &path_res.to_string_lossy(),
-        ])?;
+        let ocr = || {
+            command::ocrmypdf([
+                "-l",
+                "rus+eng",
+                &record_pdf.to_string_lossy(),
+                &path_res.to_string_lossy(),
+            ])
+        };
+
+        ocr.retry(ConstantBuilder::new())
+            .sleep(std::thread::sleep)
+            .call()?;
 
         pb.println(format!(
             "ocr processing for {} record is done in {}",

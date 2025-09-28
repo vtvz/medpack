@@ -36,7 +36,11 @@ impl TextEntity {
             TextEntity::Link { text } => wrap(text, "span"),
             TextEntity::Phone { text } => wrap(text, "span"),
             TextEntity::Plain { text } => wrap(text, "span"),
-            TextEntity::Pre { text, language: _ } => wrap(text, "pre"),
+            TextEntity::Pre { text, language } => match language.as_str() {
+                "html" => text.to_string(),
+                "hidden" => String::new(),
+                _ => wrap(text, "pre"),
+            },
             TextEntity::Strikethrough { text } => wrap(text, "s"),
             TextEntity::TextLink { text, href: _ } => wrap(text, "span"),
         }
