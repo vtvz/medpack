@@ -11,8 +11,7 @@ pub struct App {
     tmp_html: Temp,
     tmp_label: Temp,
     tmp_records: Temp,
-    pub process_ocr: bool,
-    pub unadaptive_text_pages: bool,
+    cli: Cli,
 }
 
 impl App {
@@ -28,14 +27,17 @@ impl App {
         Ok(tmp)
     }
 
+    pub fn cli(&self) -> &Cli {
+        &self.cli
+    }
+
     pub fn new(cli: Cli) -> eyre::Result<Self> {
         Ok(Self {
             tmp_img: Self::generate_tmp("img", cli.preserve_tmp)?,
             tmp_html: Self::generate_tmp("html", cli.preserve_tmp)?,
             tmp_label: Self::generate_tmp("label", cli.preserve_tmp)?,
             tmp_records: Self::generate_tmp("records", cli.preserve_tmp)?,
-            process_ocr: !cli.no_ocr,
-            unadaptive_text_pages: cli.unadaptive_text_pages,
+            cli,
         })
     }
 

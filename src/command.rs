@@ -2,51 +2,86 @@ use std::ffi::OsStr;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output};
 
-use eyre::{Ok, eyre};
+use eyre::eyre;
 use lazy_static::lazy_static;
 use tempdir::TempDir;
 
 use crate::write_err;
 
-pub fn cmd(cmd: &str, args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> eyre::Result<String> {
+pub struct CommandResult {
+    cmd: Command,
+    output: Output,
+}
+
+impl CommandResult {
+    pub fn stdout(&self) -> eyre::Result<String> {
+        let res = String::from_utf8(self.output.stdout.clone())?;
+
+        Ok(res)
+    }
+
+    pub fn stderr(&self) -> eyre::Result<String> {
+        let res = String::from_utf8(self.output.stderr.clone())?;
+
+        Ok(res)
+    }
+}
+
+impl std::fmt::Display for CommandResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let cmd = format!("{:?}", self.cmd);
+        let stderr = self.stderr().map_err(|_| std::fmt::Error)?;
+        let stdout = self.stdout().map_err(|_| std::fmt::Error)?;
+        let status = self.output.status.to_string();
+
+        write!(f, "{cmd}\nstatus: {status}\n{stdout}\n{stderr}")
+    }
+}
+
+pub fn cmd(
+    cmd: &str,
+    args: impl IntoIterator<Item = impl AsRef<OsStr>>,
+) -> eyre::Result<CommandResult> {
     let mut cmd = Command::new(cmd);
     cmd.args(args);
 
     let res = cmd.output()?;
+    let res = CommandResult { cmd, output: res };
 
-    if res.status.success() {
-        Ok(String::from_utf8(res.stdout)?)
+    if res.output.status.success() {
+        Ok(res)
     } else {
-        write_err(String::from_utf8(res.stderr)?)?;
-        write_err(String::from_utf8(res.stdout)?)?;
+        write_err(&res)?;
 
-        Err(eyre!("Exited with exit code {}", res.status))
+        Err(eyre!("Exited with exit code {}", res.output.status))
     }
 }
 
-pub fn pdf_info(path: impl AsRef<OsStr> + std::fmt::Debug) -> eyre::Result<String> {
+pub fn pdf_info(path: impl AsRef<OsStr> + std::fmt::Debug) -> eyre::Result<CommandResult> {
     cmd("pdfinfo", [path])
 }
 
 pub fn img2pdf(
     args: impl IntoIterator<Item = impl AsRef<OsStr>> + std::fmt::Debug,
-) -> eyre::Result<String> {
+) -> eyre::Result<CommandResult> {
     cmd("img2pdf", args)
 }
 
 pub fn pdfunite(
     pdfs: impl IntoIterator<Item = impl AsRef<OsStr>> + std::fmt::Debug,
-) -> eyre::Result<String> {
+) -> eyre::Result<CommandResult> {
     cmd("pdfunite", pdfs)
 }
 
-pub fn cpdf(params: impl IntoIterator<Item = impl AsRef<OsStr>>) -> eyre::Result<String> {
+pub fn cpdf(params: impl IntoIterator<Item = impl AsRef<OsStr>>) -> eyre::Result<CommandResult> {
     cmd("cpdf", params)
 }
 
-pub fn ocrmypdf(params: impl IntoIterator<Item = impl AsRef<OsStr>>) -> eyre::Result<String> {
+pub fn ocrmypdf(
+    params: impl IntoIterator<Item = impl AsRef<OsStr>>,
+) -> eyre::Result<CommandResult> {
     cmd("ocrmypdf", params)
 }
 
@@ -54,7 +89,7 @@ pub fn wkhtmltopdf(
     args: &[impl AsRef<OsStr> + std::fmt::Debug],
     input: impl AsRef<OsStr>,
     output: impl AsRef<OsStr>,
-) -> eyre::Result<String> {
+) -> eyre::Result<CommandResult> {
     let mut new_args = Vec::from_iter(args.iter().map(|arg| arg.as_ref()));
 
     new_args.push(input.as_ref());
@@ -96,7 +131,7 @@ pub struct DenoArgs<'a> {
     pub bottom_link: &'a str,
 }
 
-pub fn deno(args: DenoArgs) -> eyre::Result<String> {
+pub fn deno(args: DenoArgs) -> eyre::Result<CommandResult> {
     let deno_file = DENO_FILE.to_str().unwrap();
     let font_path = ROBOTO_FONT_FILE.to_str().unwrap();
 

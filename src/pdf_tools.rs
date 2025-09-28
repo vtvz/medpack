@@ -89,7 +89,7 @@ impl PdfTools {
 
         let page_margin = 10;
 
-        if app.unadaptive_text_pages {
+        if app.cli().unadaptive_text_pages {
             generate_file(297, page_margin)?;
 
             return Ok(output_path);
@@ -196,7 +196,7 @@ impl PdfTools {
     }
 
     pub fn get_pages_count(path: &PathBuf) -> eyre::Result<u8> {
-        let out = command::pdf_info(path)?;
+        let out = command::pdf_info(path)?.stdout()?;
         let re = Regex::new(r"(?m)^Pages:\s+(\d+)$")?;
 
         let cap = re.captures(&out).ok_or(eyre::eyre!("Need captures"))?;

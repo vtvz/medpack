@@ -39,6 +39,10 @@ struct Cli {
     #[arg(long)]
     no_ocr: bool,
 
+    /// Skip images processing with ocr
+    #[arg(long, default_value_t = 3)]
+    ocr_retries: usize,
+
     /// Do not shrink or extend text pages (including toc)
     #[arg(long)]
     unadaptive_text_pages: bool,
@@ -248,7 +252,7 @@ fn process_record<'a>(
     };
 
     // OCR
-    let record_pdf = if !app.process_ocr || !rec.is_images() {
+    let record_pdf = if app.cli().no_ocr || !rec.is_images() {
         record_pdf
     } else {
         pb.set_message(format!("process ocr for {} record", rec.record_id()));
@@ -260,13 +264,23 @@ fn process_record<'a>(
             command::ocrmypdf([
                 "-l",
                 "rus+eng",
+                "-O0",
+                "--output-type",
+                "pdf",
                 &record_pdf.to_string_lossy(),
                 &path_res.to_string_lossy(),
             ])
         };
 
-        ocr.retry(ConstantBuilder::new())
+        ocr.retry(ConstantBuilder::new().with_max_times(app.cli().ocr_retries))
             .sleep(std::thread::sleep)
+            .notify(|err: &eyre::Error, dur: Duration| {
+                pb.println(format!(
+                    "ocr is failed for {} record. retrying {err:?} after {}",
+                    rec.record_id(),
+                    HumanDuration(dur)
+                ));
+            })
             .call()?;
 
         pb.println(format!(
