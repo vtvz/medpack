@@ -6,7 +6,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use backon::{BlockingRetryable, ConstantBuilder, ExponentialBuilder};
+use backon::{BlockingRetryable, ConstantBuilder};
 use clap::Parser;
 use eyre::Ok;
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
