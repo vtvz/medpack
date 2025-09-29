@@ -140,6 +140,122 @@ doctor: Dr. Smith
 
 For messages without images or PDF files, any text following the YAML block will be used as the medical document data.
 
+#### 📝 Text Record Formatting
+
+For text-only records (messages without images or PDF files), you can use special code blocks to enhance the content:
+
+**HTML Code Blocks** - Insert raw HTML directly into the generated PDF:
+
+````
+```html
+<table border="1">
+  <tr>
+    <th>Parameter</th>
+    <th>Value</th>
+    <th>Normal Range</th>
+  </tr>
+  <tr>
+    <td>Blood Pressure</td>
+    <td>140/90</td>
+    <td>120/80</td>
+  </tr>
+</table>
+```
+````
+
+**Hidden Code Blocks** - Add personal notes that won't appear in the final PDF:
+
+````
+```hidden
+This is a private note for my reference only.
+It will not be included in the generated PDF document.
+Useful for personal reminders or draft content.
+```
+````
+
+**Example Text Record:**
+
+````
+```yaml
+date: 2023.12.22
+person: John Doe
+tags:
+  - consultation
+  - notes
+```
+
+Patient reported feeling better after treatment.
+
+```html
+<table border="1">
+  <tr><th>Medication</th><th>Dosage</th></tr>
+  <tr><td>Aspirin</td><td>100mg daily</td></tr>
+</table>
+```
+
+Follow-up appointment scheduled for next month.
+
+```hidden
+Remember to follow up on blood test results next week.
+Patient seemed anxious - consider referral to counselor.
+```
+````
+
+#### 📝 Text Record Formatting
+
+For text-only records (messages without images or PDF files), you can use special code blocks to enhance the content:
+
+**HTML Code Blocks** - Insert raw HTML directly into the generated PDF:
+
+````
+```html
+<div style="color: red; font-weight: bold;">
+  <p>Important medical note with custom formatting</p>
+  <ul>
+    <li>Symptom 1</li>
+    <li>Symptom 2</li>
+  </ul>
+</div>
+```
+````
+
+**Hidden Code Blocks** - Add personal notes that won't appear in the final PDF:
+
+````
+```hidden
+This is a private note for my reference only.
+It will not be included in the generated PDF document.
+Useful for personal reminders or draft content.
+```
+````
+
+**Example Text Record:**
+
+````
+date: 2023.12.22
+person: John Doe
+tags:
+  - consultation
+  - notes
+
+Patient reported feeling better after treatment.
+
+```html
+<table border="1">
+  <tr><th>Medication</th><th>Dosage</th></tr>
+  <tr><td>Aspirin</td><td>100mg daily</td></tr>
+</table>
+````
+
+```hidden
+Remember to follow up on blood test results next week.
+Patient seemed anxious - consider referral to counselor.
+```
+
+Follow-up appointment scheduled for next month.
+
+````
+
 #### ⚠️ Important YAML Block Requirements
 
 - **📍 Position**: The YAML block **must be at the very beginning** of the message text
@@ -161,13 +277,6 @@ For messages without images or PDF files, any text following the YAML block will
 
 Tags now support HTML formatting for enhanced visual presentation in the generated PDFs. This is particularly useful for highlighting important issues or categorizing records with visual emphasis.
 
-**Supported HTML Tags:**
-
-- `<b>` - Bold text for highlighting critical issues
-- `<i>` - Italic text for emphasis
-- `<u>` - Underlined text
-- `<span>` - With CSS styling for custom formatting
-
 **Examples:**
 
 ```yaml
@@ -177,7 +286,7 @@ tags:
   - <i>follow-up required</i>
   - ECG
   - <b style="color: red;">critical</b>
-```
+````
 
 ## 📤 Output
 
