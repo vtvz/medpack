@@ -138,8 +138,6 @@ place: City Hospital
 doctor: Dr. Smith
 ```
 
-For messages without images or PDF files, any text following the YAML block will be used as the medical document data.
-
 #### 📝 Text Record Formatting
 
 For text-only records (messages without images or PDF files), you can use special code blocks to enhance the content:
@@ -147,6 +145,8 @@ For text-only records (messages without images or PDF files), you can use specia
 **HTML Code Blocks** - Insert raw HTML directly into the generated PDF
 
 **Hidden Code Blocks** - Add personal notes that won't appear in the final PDF
+
+**Telegram Formatting** - All Telegram message formatting is preserved
 
 **Example Text Record:**
 
