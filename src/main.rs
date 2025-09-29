@@ -265,6 +265,8 @@ fn process_record<'a>(
                 "-l",
                 "rus+eng",
                 "-O0",
+                "--tesseract-oem",
+                "1",
                 "--output-type",
                 "pdf",
                 &record_pdf.to_string_lossy(),
