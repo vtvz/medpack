@@ -127,7 +127,7 @@ telegram_export/
 
 ### YAML Metadata Format
 
-Messages can contain YAML blocks with medical record metadata:
+Messages MUST contain YAML blocks with medical record metadata:
 
 ```yaml
 date: 2023.12.22
