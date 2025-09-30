@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use chrono::NaiveDateTime;
+use csv::ReaderBuilder;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
@@ -38,12 +39,48 @@ impl TextEntity {
             TextEntity::Plain { text } => wrap(text, "span"),
             TextEntity::Pre { text, language } => match language.as_str() {
                 "html" => text.to_string(),
+                "csv" => Self::csv_to_html(text),
                 "hidden" => String::new(),
                 _ => wrap(text, "pre"),
             },
             TextEntity::Strikethrough { text } => wrap(text, "s"),
             TextEntity::TextLink { text, href: _ } => wrap(text, "span"),
         }
+    }
+
+    fn csv_to_html(text: &str) -> String {
+        let reader = ReaderBuilder::new()
+            .has_headers(false)
+            .from_reader(text.as_bytes());
+
+        let mut rows = vec![];
+        let mut header = String::new();
+        for (i, record) in reader.into_records().enumerate() {
+            let record = match record {
+                Ok(record) => record,
+                Err(_) => return text.to_string(),
+            };
+
+            let tag = if i == 0 { "th" } else { "td" };
+            let cells = record
+                .iter()
+                .map(|item| format!("<{tag}>{item}</{tag}>"))
+                .join("");
+            if i == 0 {
+                header = format!("<tr>{cells}</tr>");
+            } else {
+                rows.push(format!("<tr>{cells}</tr>"));
+            }
+        }
+        let table = format!(
+            "<table class='table table-bordered table-sm table-striped' style='width: inherit'>
+                <thead>{header}</thead>
+                <tbody>{rows}</tbody>
+            </table>",
+            rows = rows.join("")
+        );
+
+        table
     }
 }
 

@@ -146,6 +146,8 @@ For text-only records (messages without images or PDF files), you can use specia
 
 **HTML Code Blocks** - Insert raw HTML directly into the generated PDF
 
+**CSV Code Blocks** - Create tables from CSV data, where the first row is treated as the header
+
 **Hidden Code Blocks** - Add personal notes that won't appear in the final PDF
 
 **Telegram Formatting** - All Telegram message formatting is preserved
@@ -165,10 +167,16 @@ tags:
 Patient reported feeling better after treatment.
 
 ```html
-<table class="table table-bordered table-sm table-striped">
-  <tr><th>Medication</th><th>Dosage</th></tr>
-  <tr><td>Aspirin</td><td>100mg daily</td></tr>
-</table>
+<div class="alert alert-info">
+  <strong>Important:</strong> Patient has allergies to penicillin and sulfa drugs.
+</div>
+```
+
+```csv
+Medication,Dosage,Frequency,Duration
+Aspirin,100mg,Daily,30 days
+Lisinopril,10mg,Daily,Ongoing
+Metformin,500mg,Twice daily,90 days
 ```
 
 Follow-up appointment scheduled for next month.
