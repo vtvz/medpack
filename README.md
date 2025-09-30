@@ -97,6 +97,8 @@ medpack ~/Downloads/ChatExport_2023 ~/Downloads/ChatExport_2024
 ```
 
 > **💡 Tip**: When processing multiple exports, MedPack will merge them together. This allows you to process only new days in the future instead of re-exporting the entire chat history - simply export the new messages and process them alongside your existing exports.
+>
+> **📝 Note**: When merging exports that contain the same messages (including edited versions), MedPack automatically uses the latest edited version of each message. This ensures that any corrections or updates made to medical records in Telegram are properly reflected in the final PDF output.
 
 ## 📁 Input Format
 
@@ -148,7 +150,8 @@ For text-only records (messages without images or PDF files), you can use specia
 
 **Telegram Formatting** - All Telegram message formatting is preserved
 
-**Example Text Record:**
+<details>
+<summary><strong>Example Text Record:</strong></summary>
 
 ````
 ```yaml
@@ -175,6 +178,8 @@ Remember to follow up on blood test results next week.
 Patient seemed anxious - consider referral to counselor.
 ```
 ````
+
+</details>
 
 #### ⚠️ Important YAML Block Requirements
 
@@ -247,9 +252,11 @@ medpack: error: `img2pdf` not found in PATH
 #### OCR Processing Slow
 
 ```bash
-# Use --no-ocr flag for faster processing
+# Use --no-ocr flag to completely disable OCR processing
 medpack --no-ocr
 ```
+
+**Note**: The `--no-ocr` flag completely disables OCR processing for images, which significantly speeds up processing but means that text within images will not be extracted or searchable in the final PDF.
 
 ### Debug Mode
 
