@@ -58,7 +58,11 @@ impl TextEntity {
         for (i, record) in reader.into_records().enumerate() {
             let record = match record {
                 Ok(record) => record,
-                Err(_) => return text.to_string(),
+                Err(err) => {
+                    crate::write_err(format!("{err:?}")).ok();
+
+                    return text.to_string();
+                },
             };
 
             let tag = if i == 0 { "th" } else { "td" };
