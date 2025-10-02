@@ -23,18 +23,18 @@ MedPack transforms chaotic Telegram chat exports containing medical records into
 
 ## 📺 Live Example
 
-Want to see MedPack in action? Check out our **live example Telegram channel**:
+Want to see MedPack in action? Check out our **live example Telegram group**:
 
-**🔗 [MedPack Example Channel](https://t.me/medpack_example)**
+**🔗 [MedPack Example Group](https://t.me/medpack_example)**
 
-This channel contains:
+This group contains:
 
 - **📱 Real medical record messages** with proper YAML metadata formatting
 - **🖼️ Sample images and PDFs** showing the input format MedPack expects
 - **📄 Processing results** - the final generated PDF documents
 - **💡 Best practices** for structuring your medical records in Telegram
 
-The channel demonstrates exactly how to format your Telegram messages for optimal MedPack processing, including proper YAML metadata blocks, image attachments, and text formatting. You can use this as a reference when preparing your own medical record exports.
+The group demonstrates exactly how to format your Telegram messages for optimal MedPack processing, including proper YAML metadata blocks, image attachments, and text formatting. You can use this as a reference when preparing your own medical record exports.
 
 ## 🚀 Quick Start
 
