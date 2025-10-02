@@ -1,9 +1,9 @@
 # MedPack
 
-> **📢 Subscribe to the author's channel for updates and more projects:** [**@vtvz_dev**](https://t.me/vtvz_dev)
-
 [![Rust](https://img.shields.io/badge/rust-nightly--2025--07--22-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+> **📢 Subscribe to the author's telegram channel for updates and more projects:** [**@vtvz_dev**](https://t.me/vtvz_dev)
 
 A powerful Rust-based tool for processing and organizing medical documents from Telegram chat exports into structured PDF documents with automatic OCR, metadata extraction, and comprehensive table of contents generation.
 
