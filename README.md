@@ -304,3 +304,5 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 **📧 Support**: For issues and questions, please use the GitHub issue tracker.
 
 **🔄 Updates**: Check releases for the latest features and bug fixes.
+
+**💬 Personal Support**: If you have any questions or need help, feel free to reach out to me personally on Telegram: [@vtvz_me](https://t.me/vtvz_me)
