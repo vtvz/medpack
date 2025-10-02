@@ -1,5 +1,7 @@
 # MedPack
 
+> **📢 Subscribe to the author's channel for updates and more projects:** [**@vtvz_dev**](https://t.me/vtvz_dev)
+
 [![Rust](https://img.shields.io/badge/rust-nightly--2025--07--22-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
