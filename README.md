@@ -9,7 +9,7 @@ A powerful Rust-based tool for processing and organizing medical documents from 
 
 ## 🎯 Overview
 
-MedPack transforms chaotic Telegram chat exports containing medical records into beautifully organized PDF documents. It intelligently processes images, PDFs, and text messages, groups them by person, and creates professional medical document collections with proper pagination, OCR processing, and detailed table of contents.
+MedPack transforms structured Telegram chat exports containing medical records into beautifully organized PDF documents. It intelligently processes images, PDFs, and text messages, groups them by person, and creates professional medical document collections with proper pagination, OCR processing, and detailed table of contents.
 
 ### Key Features
 
