@@ -40,11 +40,19 @@ The group demonstrates exactly how to format your Telegram messages for optimal 
 
 ## 🚀 Quick Start
 
-### Prerequisites
+The easiest way to run MedPack is using **Docker**. All prerequisites are preinstalled in the image.
+
+```bash
+docker run --rm -v "$(pwd):$(pwd)" -w "$(pwd)" -u "$(id -u):$(id -g)" -it --pull always ghcr.io/vtvz/medpack:latest
+```
+
+### Building from Source
+
+#### Prerequisites
 
 Before using MedPack, ensure you have all the required external tools installed. The complete list of required tools can be found in the `src/command.rs` file.
 
-### Building MedPack
+#### Building MedPack
 
 1. **Clone the repository:**
 
@@ -61,7 +69,7 @@ cargo build --release
 
 The binary will be available at `target/release/medpack`.
 
-### Installing MedPack
+#### Installing MedPack
 
 Alternatively, you can install MedPack directly to your system using Cargo:
 
