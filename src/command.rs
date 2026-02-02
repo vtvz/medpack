@@ -3,6 +3,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::LazyLock;
 
 use eyre::eyre;
 use lazy_static::lazy_static;
@@ -134,6 +135,13 @@ pub struct DenoArgs<'a> {
 pub fn deno(args: DenoArgs) -> eyre::Result<CommandResult> {
     let deno_file = DENO_FILE.to_str().unwrap();
     let font_path = ROBOTO_FONT_FILE.to_str().unwrap();
+
+    static INITIAL_INSTALL: LazyLock<CommandResult> = LazyLock::new(|| {
+        let deno_file = DENO_FILE.to_str().unwrap();
+        cmd("deno", ["install", "--entrypoint", deno_file]).expect("Installed")
+    });
+
+    let _ = *INITIAL_INSTALL;
 
     let args = [
         "run",
