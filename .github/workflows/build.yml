@@ -81,11 +81,12 @@ jobs:
           GIT_COMMIT_TIMESTAMP=$(git show --no-patch --format=%cI)
           GIT_DESCRIBE=$(git describe --abbrev=10 --always)
           IMAGE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${GIT_DESCRIBE}"
+          IMAGE_TAG_LATEST="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
 
           echo "git_commit=${GIT_COMMIT}" >> $GITHUB_OUTPUT
           echo "git_commit_timestamp=${GIT_COMMIT_TIMESTAMP}" >> $GITHUB_OUTPUT
           echo "git_describe=${GIT_DESCRIBE}" >> $GITHUB_OUTPUT
-          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "image_tag=${IMAGE_TAG},${IMAGE_TAG_LATEST}" >> $GITHUB_OUTPUT
 
       - name: Build and push main image
         uses: docker/build-push-action@v5
