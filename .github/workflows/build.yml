@@ -102,5 +102,5 @@ jobs:
             GIT_SHA=${{ steps.meta.outputs.git_commit }}
             GIT_COMMIT_TIMESTAMP=${{ steps.meta.outputs.git_commit_timestamp }}
             GIT_DESCRIBE=${{ steps.meta.outputs.git_describe }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
