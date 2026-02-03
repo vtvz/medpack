@@ -37,7 +37,7 @@ ARG TARGETARCH
 
 # wkhtmltopdf is installed from github as it needs to be `with patched qt`
 RUN \
-  --mount=type=cache,target=/var/cache/apt \
+  --mount=type=cache,target=/var/cache/apt,id=apt-$TARGETARCH \
   apt-get update && apt-get install --no-install-recommends -y ca-certificates wget curl unzip \
   && apt-get install --no-install-recommends -y poppler-utils img2pdf ocrmypdf tesseract-ocr-eng tesseract-ocr-rus \
   && apt-get clean \
