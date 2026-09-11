@@ -5,6 +5,10 @@ use csv::ReaderBuilder;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
+pub mod rich;
+
+pub use rich::*;
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum TextEntity {
@@ -110,7 +114,9 @@ pub struct Message {
     pub from_id: Option<String>,
     pub forwarded_from: Option<String>,
     pub reply_to_message_id: Option<i64>,
+    #[serde(default)]
     pub text_entities: Vec<TextEntity>,
+    pub rich_message: Option<RichMessage>,
     pub edited: Option<NaiveDateTime>,
     pub edited_unixtime: Option<String>,
     pub file: Option<String>,
@@ -159,7 +165,7 @@ impl Record {
 
 impl Message {
     pub fn is_text_empty(&self) -> bool {
-        self.text_entities.is_empty()
+        self.text_entities.is_empty() && self.rich_message.is_none()
     }
 
     pub fn is_photo(&self) -> bool {
@@ -206,14 +212,24 @@ impl Message {
     }
 
     pub fn get_record(&self) -> eyre::Result<Record> {
-        let Some(TextEntity::Pre { text, .. }) = self.text_entities.first() else {
-            return Err(eyre::eyre!("No entry"));
+        let text = if let Some(rich) = &self.rich_message {
+            let Some(RichBlock::Code { text, .. }) = rich.blocks.first() else {
+                return Err(eyre::eyre!("No entry"));
+            };
+
+            text.plain_text()
+        } else {
+            let Some(TextEntity::Pre { text, .. }) = self.text_entities.first() else {
+                return Err(eyre::eyre!("No entry"));
+            };
+
+            text.clone()
         };
 
         // let reg = Regex::new(r"(?m)^date: (\S*)$")?;
         // let text = reg.replace(text, r#"date: "$1""#);
 
-        let entry = serde_yaml::from_str(text);
+        let entry = serde_yaml::from_str(&text);
 
         match entry {
             Ok(expr) => Ok(expr),

@@ -1,6 +1,6 @@
 # MedPack
 
-[![Rust](https://img.shields.io/badge/rust-nightly--2025--07--22-orange.svg)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/rust-nightly--2026--09--11-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 > **📢 Subscribe to the author's telegram channel for updates and more projects:** [**@vtvz_dev**](https://t.me/vtvz_dev)
@@ -176,6 +176,21 @@ For text-only records (messages without images or PDF files), you can use specia
 **Hidden Code Blocks** - Add personal notes that won't appear in the final PDF
 
 **Telegram Formatting** - All Telegram message formatting is preserved
+
+#### 📑 Rich Text Messages
+
+Newer Telegram exports can contain **rich text messages** (`rich_message` in `result.json`) instead of plain `text_entities`. MedPack fully supports them, rendering all rich blocks into the PDF:
+
+- **Tables** - Native Telegram tables with headers, alignment, borders, and striping
+- **Headings** - Levels 1–6
+- **Quotes** - Regular and pull quotes with captions
+- **Lists** - Ordered, bullet, and nested lists, including checklists (☐/☑)
+- **Details** - Collapsible sections are rendered as a bold title with always-visible content
+- **Code blocks** - The same `html`, `csv`, and `hidden` languages work as in regular messages
+- **Inline formatting** - Bold, italic, underline, strikethrough, spoiler, subscript, superscript, highlight, and links
+- **Dividers, footers, and URL buttons**
+
+The YAML metadata block must still be the **first block** of the rich message (a `yaml` code block).
 
 <details>
 <summary><strong>Example Text Record:</strong></summary>

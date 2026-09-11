@@ -1,4 +1,3 @@
-#![feature(exit_status_error)]
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::{self, OpenOptions};
@@ -210,10 +209,14 @@ fn process_message(app: &App, msg: &Message, pb: &ProgressBar) -> eyre::Result<P
 
         path_img
     } else {
-        let content = msg.text_entities[1..]
-            .iter()
-            .map(|entity| entity.to_html())
-            .join("");
+        let content = if let Some(rich) = &msg.rich_message {
+            rich.body_to_html()
+        } else {
+            msg.text_entities[1..]
+                .iter()
+                .map(|entity| entity.to_html())
+                .join("")
+        };
 
         PdfTools::from_html(app, msg.id, &content, pb)?
     };
@@ -310,7 +313,7 @@ fn process_record<'a>(
     if tags.chars().count() > 58 {
         tags = format!("{}...", tags.chars().take(55).collect::<String>());
     }
-    let label = format!("{}: {}", tags, &rec.date);
+    let label = format!("{}: {}", tags, rec.date);
 
     let paging = "стр %Page из %EndPage".to_string();
 
