@@ -42,6 +42,12 @@ impl PdfTools {
         .message-id a {
             color: #c6c6c6;
         }
+
+        blockquote {
+            border-left: 3px solid #c6c6c6;
+            padding: 2px 10px;
+            margin: 5px 0;
+        }
         "#;
 
         let content = format!(

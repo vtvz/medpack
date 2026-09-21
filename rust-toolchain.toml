@@ -1,6 +1,6 @@
 # https://rust-lang.github.io/rustup-components-history/
 [toolchain]
-channel = "nightly-2025-07-22"
+channel = "nightly-2026-09-11"
 targets = ["x86_64-unknown-linux-gnu"]
 components = ["rust-analyzer", "clippy", "rustfmt"]
 profile = "minimal"
