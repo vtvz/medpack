@@ -18,9 +18,14 @@ impl PdfTools {
         content: &str,
         pb: &ProgressBar,
     ) -> eyre::Result<PathBuf> {
-        let bootstrap = include_str!("assets/bootstrap-v4.6.2.min.css");
+        // compiled without print styles by tools/bootstrap-css
+        let bootstrap = include_str!("assets/bootstrap-v4.6.2.css");
 
         let css_style = r#"
+        html {
+            font-size: 140%;
+        }
+
         html * {
             font-family: "DejaVu Sans", sans-serif;
             line-height: 1.1;
@@ -50,50 +55,37 @@ impl PdfTools {
         }
         "#;
 
-        let content = format!(
-            r#"
-            <!doctype html>
-            <html>
-                <head>
-                    <title>Page Title</title>
-                    <style>{bootstrap}</style>
-                    <style>{css_style}</style>
-                </head>
-                <body>
-                    {content}
-                </body>
-            </html>
-            "#
-        );
-
         let path = app.tmp_html(format!("{slug}.html"));
         // let path = format!("test/{}.html", slug);
         let output_path = app.tmp_html(format!("{slug}.pdf"));
 
-        fs::write(&path, content).expect("Should have been able to read the file");
-
         let generate_file = |height: u64, margin: u64| {
-            command::wkhtmltopdf(
-                &[
-                    "--encoding",
-                    "utf-8",
-                    "--zoom",
-                    "1.4",
-                    "--dpi",
-                    "96",
-                    "--no-print-media-type",
-                    "--page-width",
-                    "210mm",
-                    "--page-height",
-                    &format!("{height}mm"),
-                    "--margin-top",
-                    &format!("{margin}mm"),
-                    "--margin-bottom",
-                    &format!("{margin}mm"),
-                ],
-                &path,
-                &output_path,
-            )
+            let html = format!(
+                r#"
+                <!doctype html>
+                <html>
+                    <head>
+                        <meta charset="utf-8" />
+                        <title>Page Title</title>
+                        <style>{bootstrap}</style>
+                        <style>{css_style}</style>
+                        <style>
+                        @page {{
+                            size: 210mm {height}mm;
+                            margin: {margin}mm 10mm;
+                        }}
+                        </style>
+                    </head>
+                    <body>
+                        {content}
+                    </body>
+                </html>
+                "#
+            );
+
+            fs::write(&path, html).expect("Should have been able to write the file");
+
+            command::weasyprint(&path, &output_path)
         };
 
         let page_margin = 10;

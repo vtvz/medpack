@@ -79,6 +79,16 @@ cargo install --path .
 
 This will install the `medpack` binary to your Cargo bin directory (usually `~/.cargo/bin/`), making it available system-wide.
 
+#### Regenerating the Bundled Bootstrap CSS
+
+The PDF stylesheet (`src/assets/bootstrap-v4.6.2.css`) is Bootstrap 4.6.2 compiled **without print styles**, which would otherwise break WeasyPrint rendering. To regenerate it:
+
+```bash
+cd tools/bootstrap-css
+npm install
+node build.js
+```
+
 ## 📖 Usage
 
 ### Basic Usage

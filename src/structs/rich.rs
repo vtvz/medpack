@@ -134,7 +134,7 @@ impl RichBlock {
                     .join("");
 
                 format!(
-                    "<table class='{classes}' style='width: inherit; font-size: 13px'>{caption}{rows}</table>",
+                    "<table class='{classes}' style='width: inherit; font-size: 0.8em'>{caption}{rows}</table>",
                     classes = classes.join(" ")
                 )
             },
@@ -217,7 +217,7 @@ impl RichBlock {
 
                 format!("<{tag}{reversed}>{items}</{tag}>")
             },
-            // wkhtmltopdf doesn't support <details>, render title + content
+            // <details> is interactive and useless in PDF, render title + content
             RichBlock::Details { title, blocks, .. } => {
                 let body = blocks.iter().map(RichBlock::to_html).join("");
 
