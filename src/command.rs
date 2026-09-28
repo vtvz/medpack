@@ -86,17 +86,11 @@ pub fn ocrmypdf(
     cmd("ocrmypdf", params)
 }
 
-pub fn wkhtmltopdf(
-    args: &[impl AsRef<OsStr> + std::fmt::Debug],
+pub fn weasyprint(
     input: impl AsRef<OsStr>,
     output: impl AsRef<OsStr>,
 ) -> eyre::Result<CommandResult> {
-    let mut new_args = Vec::from_iter(args.iter().map(|arg| arg.as_ref()));
-
-    new_args.push(input.as_ref());
-    new_args.push(output.as_ref());
-
-    cmd("wkhtmltopdf", new_args)
+    cmd("weasyprint", [input.as_ref(), output.as_ref()])
 }
 
 lazy_static! {
